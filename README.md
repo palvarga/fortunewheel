@@ -26,3 +26,12 @@ A `main` ágra érkező minden push automatikusan kikerül a Vercelre (projekt: 
 Robotgyári ritmusjáték: üsd ütemre a csavaranyákat (D F J K / nyilak / koppintás), a robotok robothangon éneklik
 a dallamot, és a kombó növekedésével robot-táncból fejen pörgésbe és szélmalomba váltanak.
 Élő: https://fortunewheel-five.vercel.app/robotdance/
+
+## További Jatekguru-játékok
+| Játék | Cím |
+|---|---|
+| Sütikígyó – erdei kígyó cukrászsütikkel és viperával | https://fortunewheel-five.vercel.app/kigyo/ |
+| Csillagpong – űrhajós pong, 3 gépi fokozat, sci-fi zene | https://fortunewheel-five.vercel.app/pong/ |
+| Vízibiciklis Mélytengeri Kaland – víz alatti aszteroidás játék | https://fortunewheel-five.vercel.app/vizibicikli/ |
+
+Minden alkönyvtárban van `qr.png` / `qr.svg` a nyilvános címhez.

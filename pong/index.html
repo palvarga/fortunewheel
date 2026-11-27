@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="hu">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Csillagpong</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;800&family=Exo+2:wght@400;600;800&display=swap">
+<style>
+/* Layout: teljes képernyős űrpálya (álló kijelzőn elforgatva, P1 alul), HTML menük rétegként */
+[hidden]{display:none!important}
+:root{
+  --bg:#05060f; --panel:#0e1230; --fg:#e8ecff; --muted:#8f97c4; --p1:#3ef0ff; --p2:#ff5ad1; --gold:#ffd166; --line:#2a3170;
+  --display:'Orbitron','Arial Black',sans-serif; --body:'Exo 2',system-ui,sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%;overflow:hidden;margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--body)}
+.game{position:fixed;inset:0;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
+canvas{display:block;width:100%;height:100%;touch-action:none;user-select:none;-webkit-user-select:none}
+.ov{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;overflow:auto;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px;
+  background:radial-gradient(ellipse at center,rgba(14,18,48,.55),rgba(5,6,15,.85))}
+.card{width:min(470px,100%);background:linear-gradient(160deg,#121848,#0b0f2a);border:1px solid var(--line);border-radius:18px;padding:22px 20px;text-align:center;
+  box-shadow:0 0 0 1px rgba(62,240,255,.15),0 0 40px rgba(62,240,255,.12),0 20px 50px rgba(0,0,0,.6)}
+h1{font-family:var(--display);font-weight:800;letter-spacing:.06em;margin:4px 0 6px;font-size:clamp(1.8rem,7.5vw,2.6rem);line-height:1.05;
+  background:linear-gradient(90deg,var(--p1),#9d8cff,var(--p2));-webkit-background-clip:text;background-clip:text;color:transparent;text-wrap:balance}
+.tag{color:var(--muted);margin:0 0 14px;text-wrap:balance}
+.sec{font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin:14px 0 8px}
+.lv{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+button{font-family:var(--display);font-weight:800;font-size:.95rem;letter-spacing:.04em;border:1px solid transparent;border-radius:12px;padding:12px 10px;cursor:pointer;color:#04121a;
+  background:linear-gradient(#7ff7ff,#22c7e0);box-shadow:0 0 18px rgba(62,240,255,.35);transition:transform .07s,box-shadow .15s}
+button:hover{box-shadow:0 0 26px rgba(62,240,255,.6)}
+button:active{transform:scale(.97)}
+button:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+button small{display:block;font-family:var(--body);font-weight:600;font-size:.72rem;letter-spacing:0;opacity:.75;margin-top:2px}
+button.lv2{background:linear-gradient(#c7b8ff,#8a72ff);box-shadow:0 0 18px rgba(157,140,255,.35)}
+button.lv3{background:linear-gradient(#ff9de6,#ff3fbf);box-shadow:0 0 18px rgba(255,90,209,.35)}
+button.wide{width:100%;margin-top:8px;color:var(--fg);background:#1a2160;border-color:var(--line);box-shadow:none}
+button.ghost{font-family:var(--body);font-weight:800;font-size:.85rem;padding:8px 12px;color:var(--fg);background:rgba(20,26,70,.8);border-color:var(--line);box-shadow:none}
+.small{font-size:.84rem;color:var(--muted);margin:12px 0 0;line-height:1.45}
+.tog{position:absolute;top:calc(8px + env(safe-area-inset-top,0px));right:max(10px,env(safe-area-inset-right,0px));display:flex;gap:6px;z-index:5}
+.big{font-family:var(--display);font-weight:800;font-size:2.4rem;margin:6px 0;font-variant-numeric:tabular-nums}
+</style>
+
+<div class="game">
+  <canvas id="cv"></canvas>
+
+  <div class="ov" id="menuOv">
+    <div class="card">
+      <h1>CSILLAGPONG</h1>
+      <p class="tag">Pajzsokkal pattogtatott űrhajók. Minden teljes oda-vissza után kiválik egy újabb hajó. A végén már egy egész flotta repül feléd.</p>
+      <div class="sec">1 játékos: a gép ellen</div>
+      <div class="lv">
+        <button data-lv="1">KADÉT<small>lassú reflex</small></button>
+        <button class="lv2" data-lv="2">PILÓTA<small>számol a falakkal</small></button>
+        <button class="lv3" data-lv="3">ADMIRÁLIS<small>szinte hibátlan</small></button>
+      </div>
+      <button class="wide" id="twoBtn">2 JÁTÉKOS · egy gépen</button>
+      <p class="small">Bal pajzs: W / S (vagy A / D) · Jobb pajzs: ↑ / ↓<br>Egérrel vagy ujjal húzva is irányíthatsz. 11 pontig tart. P: szünet.</p>
+    </div>
+  </div>
+
+  <div class="ov" id="pauseOv" hidden>
+    <div class="card"><h1>SZÜNET</h1><p class="tag">A flotta hiperűr-készenlétben várakozik.</p>
+      <button id="resumeBtn">FOLYTATÁS</button><button class="wide" id="menuBtn">Főmenü</button></div>
+  </div>
+
+  <div class="ov" id="overOv" hidden>
+    <div class="card"><div class="sec" style="margin-top:0">A csata véget ért</div><h1 id="oTitle">GYŐZELEM</h1>
+      <div class="big" id="oScore">11 : 7</div><p class="tag" id="oQuip"></p>
+      <button id="againBtn">VISSZAVÁGÓ</button><button class="wide" id="menuBtn2">Főmenü</button></div>
+  </div>
+
+  <div class="tog">
+    <button class="ghost" id="musicBtn" aria-pressed="true">♫ Zene</button>
+    <button class="ghost" id="muteBtn" aria-pressed="false">🔊</button>
+  </div>
+</div>
+
+<script>
+// ================= KONFIG =================
+const CW=160, CH=100;                 // logikai pálya: x a játéktengely, y az oldaltengely
+const PX=6, PH=9, PT=2.2;             // pajzs távolsága a széltől, fél hossza, vastagsága
+const SHIP_R=2.0, SPEED0=58, SPEED_UP=1.045, SPEED_MAX=135, MAX_SHIPS=8, WIN_SCORE=11;
+const HUMAN_SPEED=125, POINTER_SPEED=320;
+const AI={1:{name:'Kadét',speed:46,react:0.28,err:7,predict:false},
+          2:{name:'Pilóta',speed:74,react:0.13,err:3.2,predict:true},
+          3:{name:'Admirális',speed:108,react:0.05,err:1.1,predict:true}};
+const SHIP_COLS=['#3ef0ff','#ffd166','#9d8cff','#7dff9b','#ff8a5c','#ff5ad1','#6fb8ff','#f7f7ff'];
+
+// ================= ÁLLAPOT =================
+const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+let W=0,H=0,dpr=1, M=null, Minv=null, portrait=false, s=1;
+let state='menu', mode='cpu', level=2, time=0;
+let paddles=[{y:CH/2,vy:0,target:null,keyDir:0,flash:0},{y:CH/2,vy:0,target:null,keyDir:0,flash:0}];
+let ships=[], score=[0,0], serveDir=1, serveAt=0, countdown=0, shake=0, banner={text:'',t:-9,col:'#fff'};
+let ai={next:0,target:CH/2};
+const parts=[]; for(let i=0;i<400;i++) parts.push({life:0});
+const stars=[]; for(let i=0;i<180;i++) stars.push({x:Math.random(),y:Math.random(),z:0.2+Math.random()*0.8,tw:Math.random()*6});
+
+// ================= HANG + ZENE =================
+let ac=null, master=null, sfxBus=null, musBus=null, delay=null, noiseBuf=null, muted=false, musicOn=true;
+function initAudio(){
+  if(ac){ if(ac.state==='suspended') ac.resume(); return; }
+  try{
+    ac=new (window.AudioContext||window.webkitAudioContext)();
+    const comp=ac.createDynamicsCompressor(); comp.threshold.value=-16; comp.ratio.value=3;
+    master=ac.createGain(); master.gain.value=muted?0:0.85; comp.connect(master).connect(ac.destination);
+    sfxBus=ac.createGain(); sfxBus.gain.value=0.9; sfxBus.connect(comp);
+    musBus=ac.createGain(); musBus.gain.value=musicOn?0.55:0; musBus.connect(comp);
+    delay=ac.createDelay(1); delay.delayTime.value=BEAT*0.75; const fb=ac.createGain(); fb.gain.value=0.38; const dl=ac.createBiquadFilter(); dl.type='lowpass'; dl.frequency.value=2600;
+    delay.connect(dl).connect(fb).connect(delay); dl.connect(musBus);
+    noiseBuf=ac.createBuffer(1,ac.sampleRate,ac.sampleRate); const d=noiseBuf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
+  }catch(e){ ac=null; }
+}
+const mtof=m=>440*Math.pow(2,(m-69)/12);
+function envG(t,peak,att,dec,dest){ const g=ac.createGain(); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(peak,t+att); g.gain.exponentialRampToValueAtTime(0.0001,t+att+dec); g.connect(dest); return g; }
+function tone(t,type,f0,f1,dur,peak,dest=sfxBus,slide){ const o=ac.createOscillator(); o.type=type; o.frequency.setValueAtTime(f0,t); if(f1!==f0) o.frequency.exponentialRampToValueAtTime(f1,t+(slide||dur)); o.connect(envG(t,peak,0.004,dur,dest)); o.start(t); o.stop(t+dur+0.05); }
+function nz(t,dur,type,f,q,peak,dest=sfxBus){ const n=ac.createBufferSource(); n.buffer=noiseBuf; const fl=ac.createBiquadFilter(); fl.type=type; fl.frequency.value=f; if(q) fl.Q.value=q; n.connect(fl).connect(envG(t,peak,0.002,dur,dest)); n.start(t,Math.random()*0.5); n.stop(t+dur+0.05); }
+// --- effektek ---
+let lastWallSfx=0;
+function sHit(side){ if(!ac) return; const t=ac.currentTime, b=side?660:880; tone(t,'square',b*1.6,b*0.5,0.12,0.16); tone(t,'sine',b*2,b,0.08,0.12); }
+function sWall(){ if(!ac||ac.currentTime-lastWallSfx<0.06) return; lastWallSfx=ac.currentTime; tone(ac.currentTime,'triangle',300,240,0.06,0.08); }
+function sSplit(){ if(!ac) return; const t=ac.currentTime; tone(t,'sawtooth',180,1400,0.35,0.12,sfxBus,0.3); tone(t+0.05,'sine',900,2400,0.25,0.1,sfxBus,0.2); }
+function sBoom(){ if(!ac) return; const t=ac.currentTime; nz(t,0.6,'lowpass',700,0,0.6); tone(t,'sine',140,38,0.5,0.5); }
+function sPoint(p){ if(!ac) return; const t=ac.currentTime, base=p===0?72:67; [0,4,7].forEach((k,i)=>tone(t+0.12+i*0.07,'triangle',mtof(base+k),mtof(base+k),0.16,0.12)); }
+function sCount(go){ if(!ac) return; const t=ac.currentTime; tone(t,'square',go?1320:660,go?1320:660,go?0.3:0.1,0.12); }
+function sWin(){ if(!ac) return; const t=ac.currentTime; [60,64,67,72,76,79,84].forEach((m,i)=>tone(t+i*0.09,'square',mtof(m),mtof(m),0.2,0.1)); }
+// --- SCI-FI ZENE: e-moll synthwave, rétegek a hajók számától függően ---
+const BPM=108, BEAT=60/BPM, STEP=BEAT/4;
+const PROG=[{r:40,ch:[0,3,7]},{r:36,ch:[0,4,7]},{r:43,ch:[0,4,7]},{r:38,ch:[0,4,7]}]; // Em C G D
+let musStep=0, musNext=0, musicRunning=false;
+function intensity(){ return state==='play'||state==='count'?Math.min(4,ships.length):0; }
+function startMusic(){ if(!ac||musicRunning) return; musicRunning=true; musStep=0; musNext=ac.currentTime+0.1; }
+function musicTick(){
+  if(!ac||!musicRunning) return;
+  while(musNext<ac.currentTime+0.2){ playStep(musStep,musNext); musStep++; musNext+=STEP; }
+}
+function playStep(st,t){
+  if(!musicOn) return;
+  const bar=Math.floor(st/16), s16=st%16, c=PROG[bar%4], I=intensity();
+  // pad – ütemenként, lassú felfutás, két elhangolt fűrész
+  if(s16===0){ c.ch.forEach(k=>{ for(const det of [-7,7]){ const o=ac.createOscillator(); o.type='sawtooth'; o.frequency.value=mtof(c.r+24+k); o.detune.value=det;
+      const lp=ac.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=900+I*250;
+      const g=ac.createGain(); g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(0.035,t+BEAT*1.2); g.gain.linearRampToValueAtTime(0.0001,t+BEAT*4);
+      o.connect(lp).connect(g); g.connect(musBus); g.connect(delay); o.start(t); o.stop(t+BEAT*4+0.05); } }); }
+  // basszus – nyolcadok, oktávugrással
+  if(s16%2===0){ const m=c.r+(s16%4===2?12:0); const o=ac.createOscillator(); o.type='sawtooth'; o.frequency.value=mtof(m);
+    const lp=ac.createBiquadFilter(); lp.type='lowpass'; lp.Q.value=8; lp.frequency.setValueAtTime(1400,t); lp.frequency.exponentialRampToValueAtTime(180,t+STEP*1.8);
+    o.connect(lp).connect(envG(t,0.22,0.004,STEP*1.8,musBus)); o.start(t); o.stop(t+STEP*2.2); }
+  // arpeggio – tizenhatodok, nyitódó szűrővel, visszhanggal
+  if(I>=1||state==='menu'||state==='over'){ const seq=[0,1,2,1,0,2,1,2]; const k=c.ch[seq[s16%8]]+(s16>=8?12:0);
+    const o=ac.createOscillator(); o.type='square'; o.frequency.value=mtof(c.r+36+k);
+    const lp=ac.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=700+1600*(0.5+0.5*Math.sin(st/32*Math.PI))+I*300; lp.Q.value=5;
+    const g=envG(t,0.05,0.003,STEP*0.9,musBus); o.connect(lp).connect(g); g.connect(delay); o.start(t); o.stop(t+STEP); }
+  // dobok
+  if(state==='play'||state==='count'){
+    if(s16%8===0 || (I>=3&&s16%4===0)) { tone(t,'sine',150,40,0.25,0.55,musBus,0.12); }
+    if(s16===4||s16===12){ nz(t,0.14,'bandpass',1800,0.8,0.28,musBus); nz(t+0.012,0.1,'bandpass',1200,0.8,0.18,musBus); }
+    if(I>=2&&s16%2===0) nz(t,0.03,'highpass',8000,0,0.09,musBus);
+    if(I>=4&&s16%2===1) nz(t,0.02,'highpass',9000,0,0.06,musBus);
+  }
+  // lebegő „csillagcsilingelés” sok hajónál
+  if(I>=4&&s16===14&&Math.random()<0.6){ const pent=[0,3,5,7,10]; const m=c.r+48+pent[Math.floor(Math.random()*5)]; const g=envG(t,0.05,0.01,0.6,musBus); const o=ac.createOscillator(); o.type='sine'; o.frequency.value=mtof(m); o.connect(g); g.connect(delay); o.start(t); o.stop(t+0.7); }
+}
+
+// ================= JÁTÉKMENET =================
+function startGame(m,lv){
+  initAudio(); startMusic();
+  mode=m; level=lv||level; score=[0,0]; ships=[]; serveDir=Math.random()<0.5?-1:1;
+  paddles.forEach(p=>{p.y=CH/2;p.target=null;p.keyDir=0;p.flash=0;});
+  ai={next:0,target:CH/2}; banner.t=-9;
+  ['menuOv','overOv','pauseOv'].forEach(id=>show(id,false));
+  beginCount();
+}
+function beginCount(){ state='count'; countdown=3.0; lastCountShown=4; }
+let lastCountShown=4;
+function serve(){
+  const ang=(Math.random()*2-1)*0.45;
+  ships.push(newShip(CW/2,CH/2+(Math.random()-0.5)*20,serveDir*Math.cos(ang)*SPEED0,Math.sin(ang)*SPEED0));
+}
+function newShip(x,y,vx,vy){ return {x,y,vx,vy,col:SHIP_COLS[ships.length%SHIP_COLS.length],born:time,trail:0}; }
+function updatePaddles(dt){
+  paddles.forEach((p,i)=>{
+    const isCPU=mode==='cpu'&&i===1;
+    let v=0;
+    if(isCPU){
+      const A=AI[level];
+      if(time>=ai.next){ ai.next=time+A.react; ai.target=aiTarget(A); }
+      const d=ai.target-p.y; v=Math.max(-A.speed,Math.min(A.speed,d*8));
+    } else if(p.target!==null){ const d=p.target-p.y; v=Math.max(-POINTER_SPEED,Math.min(POINTER_SPEED,d*18)); }
+    else v=p.keyDir*HUMAN_SPEED;
+    p.vy=v; p.y=Math.max(PH,Math.min(CH-PH,p.y+v*dt));
+    if(p.flash>0) p.flash-=dt;
+  });
+}
+function predictY(sh,xTarget){
+  let t=(xTarget-sh.x)/sh.vx; if(t<0) return sh.y;
+  let y=sh.y+sh.vy*t, lo=SHIP_R, hi=CH-SHIP_R, span=hi-lo;
+  y-=lo; y=((y%(2*span))+2*span)%(2*span); if(y>span) y=2*span-y; return y+lo;
+}
+function aiTarget(A){
+  const px=CW-PX; let best=null, bt=1e9;
+  for(const sh of ships){ if(sh.vx<=0) continue; const t=(px-sh.x)/sh.vx; if(t>=0&&t<bt){ bt=t; best=sh; } }
+  if(!best) return CH/2+Math.sin(time)*6;
+  let y=A.predict?predictY(best,px):best.y;
+  return y+(Math.random()*2-1)*A.err*(1+Math.min(1,bt));
+}
+function stepShips(dt){
+  for(let i=ships.length-1;i>=0;i--){
+    const sh=ships[i];
+    sh.x+=sh.vx*dt; sh.y+=sh.vy*dt;
+    if(sh.y<SHIP_R){ sh.y=SHIP_R; sh.vy=Math.abs(sh.vy); sWall(); }
+    if(sh.y>CH-SHIP_R){ sh.y=CH-SHIP_R; sh.vy=-Math.abs(sh.vy); sWall(); }
+    // pajzs-ütközés
+    for(let side=0;side<2;side++){
+      const p=paddles[side], px=side?CW-PX:PX, dirOk=side?sh.vx>0:sh.vx<0;
+      if(!dirOk) continue;
+      if(Math.abs(sh.x-px)<=PT/2+SHIP_R && Math.abs(sh.y-p.y)<=PH+SHIP_R){
+        const off=Math.max(-1,Math.min(1,(sh.y-p.y)/PH)), ang=off*0.95+p.vy*0.002;
+        const sp=Math.min(SPEED_MAX,Math.hypot(sh.vx,sh.vy)*SPEED_UP);
+        const dir=side?-1:1;
+        sh.vx=dir*Math.cos(ang)*sp; sh.vy=Math.sin(ang)*sp; sh.x=px+dir*(PT/2+SHIP_R+0.1);
+        p.flash=0.18; sHit(side); burst(sh.x,sh.y,side?'#ff5ad1':'#3ef0ff',10,0.6);
+        if(side===1 && ships.length<MAX_SHIPS){ // a visszaütéstől kiválik egy új hajó
+          let a2=-ang; if(Math.abs(a2-ang)<0.35) a2=ang+(ang>=0?-0.5:0.5);
+          ships.push(newShip(sh.x,sh.y,dir*Math.cos(a2)*sp,Math.sin(a2)*sp));
+          sSplit(); setBanner('+1 ŰRHAJÓ','#ffd166'); burst(sh.x,sh.y,'#ffd166',18,1);
+        }
+      }
+    }
+    // kirepült → pont
+    if(sh.x<-SHIP_R*2||sh.x>CW+SHIP_R*2){
+      const scorer=sh.x<0?1:0; score[scorer]++; serveDir=scorer?-1:1;
+      boom(Math.max(0,Math.min(CW,sh.x)),sh.y,sh.col); ships.splice(i,1); sPoint(scorer);
+      if(!ships.length) serveAt=time+1.1;
+      if(score[scorer]>=WIN_SCORE){ endGame(scorer); return; }
+      continue;
+    }
+    // hajtómű-csóva
+    sh.trail+=dt; if(sh.trail>0.02){ sh.trail=0; const sp=Math.hypot(sh.vx,sh.vy)||1; spawn(sh.x-sh.vx/sp*SHIP_R*1.4,sh.y-sh.vy/sp*SHIP_R*1.4,-sh.vx*0.1+(Math.random()-0.5)*8,-sh.vy*0.1+(Math.random()-0.5)*8,0.35,sh.col,0.7,'trail'); }
+  }
+}
+function endGame(w){
+  state='over'; sWin(); shake=0.4;
+  const $=id=>document.getElementById(id);
+  const youWin=mode==='cpu'?w===0:true;
+  $('oTitle').textContent=mode==='cpu'?(youWin?'GYŐZELEM':'A GÉP NYERT'):(w===0?'BAL PILÓTA NYERT':'JOBB PILÓTA NYERT');
+  $('oScore').textContent=score[0]+' : '+score[1];
+  $('oQuip').textContent=mode==='cpu'?(youWin?`Legyőzted a(z) ${AI[level].name} szintű gépet. A flotta tisztelgéssel köszönt.`:`A(z) ${AI[level].name} gép győzött. A fedélzeti számítógép kissé önelégült.`):'A galaxis vastapssal ünnepel.';
+  ships=[]; setTimeout(()=>show('overOv',true),900);
+}
+function setBanner(text,col){ banner={text,col,t:time}; }
+function pause(){ if(state!=='play'&&state!=='count') return; pausedFrom=state; state='paused'; show('pauseOv',true); if(ac) ac.suspend(); }
+let pausedFrom='play';
+function resume(){ if(state!=='paused') return; state=pausedFrom; show('pauseOv',false); if(ac) ac.resume(); }
+function toMenu(){ state='menu'; ships=[]; ['pauseOv','overOv'].forEach(id=>show(id,false)); show('menuOv',true); if(ac) ac.resume(); }
+function show(id,v){ document.getElementById(id).hidden=!v; }
+
+// ================= RÉSZECSKÉK =================
+function spawn(x,y,vx,vy,life,col,size,type){ for(const p of parts) if(p.life<=0){ Object.assign(p,{x,y,vx,vy,life,max:life,col,size,type}); return; } }
+function burst(x,y,col,n,sz){ for(let i=0;i<n;i++){ const a=Math.random()*Math.PI*2, v=10+Math.random()*50; spawn(x,y,Math.cos(a)*v,Math.sin(a)*v,0.4+Math.random()*0.3,col,sz*(0.5+Math.random()),'spark'); } }
+function boom(x,y,col){ sBoom(); shake=0.3; for(let i=0;i<40;i++){ const a=Math.random()*Math.PI*2, v=8+Math.random()*70; spawn(x,y,Math.cos(a)*v,Math.sin(a)*v,0.5+Math.random()*0.6,i%3?col:(i%2?'#ffffff':'#ffd166'),0.5+Math.random()*1.4,'spark'); } }
+
+// ================= GEOMETRIA =================
+function resize(){
+  dpr=Math.min(window.devicePixelRatio||1,2);
+  W=cv.clientWidth; H=cv.clientHeight; cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr);
+  portrait=H>W*1.1;
+  s=portrait?Math.min((W-28)/CH,(H-120)/CW):Math.min((W-40)/CW,(H-96)/CH);
+  let m=new DOMMatrix().scale(dpr).translate(W/2,portrait?H/2:H/2+18);
+  if(portrait) m=m.rotate(-90);
+  M=m.scale(s).translate(-CW/2,-CH/2); Minv=M.inverse();
+}
+function toLogical(cx,cy){ const r=cv.getBoundingClientRect(); const p=Minv.transformPoint(new DOMPoint((cx-r.left)*dpr,(cy-r.top)*dpr)); return p; }
+
+// ================= RAJZ =================
+function drawShip(sh){
+  const a=Math.atan2(sh.vy,sh.vx), r=SHIP_R;
+  ctx.save(); ctx.translate(sh.x,sh.y); ctx.rotate(a);
+  // hajtómű-láng
+  const fl=0.8+Math.random()*0.6; const g=ctx.createLinearGradient(-r*1.1,0,-r*(1.1+1.6*fl),0); g.addColorStop(0,'#ffffff'); g.addColorStop(0.3,sh.col); g.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=g; ctx.beginPath(); ctx.moveTo(-r*0.9,-r*0.35); ctx.lineTo(-r*(1.1+1.6*fl),0); ctx.lineTo(-r*0.9,r*0.35); ctx.closePath(); ctx.fill();
+  // szárnyak
+  ctx.fillStyle='#2a3170'; ctx.strokeStyle=sh.col; ctx.lineWidth=0.25;
+  ctx.beginPath(); ctx.moveTo(-r*0.2,0); ctx.lineTo(-r*1.0,-r*1.1); ctx.lineTo(-r*0.6,-r*0.15); ctx.lineTo(-r*0.6,r*0.15); ctx.lineTo(-r*1.0,r*1.1); ctx.closePath(); ctx.fill(); ctx.stroke();
+  // törzs
+  ctx.fillStyle='#d9def7'; ctx.beginPath(); ctx.moveTo(r*1.3,0); ctx.quadraticCurveTo(r*0.2,-r*0.55,-r*0.95,-r*0.38); ctx.lineTo(-r*0.95,r*0.38); ctx.quadraticCurveTo(r*0.2,r*0.55,r*1.3,0); ctx.fill();
+  ctx.fillStyle=sh.col; ctx.fillRect(-r*0.7,-r*0.08,r*1.1,r*0.16);
+  // pilótafülke
+  ctx.fillStyle='#0b1238'; ctx.beginPath(); ctx.ellipse(r*0.35,0,r*0.38,r*0.22,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,.7)'; ctx.beginPath(); ctx.ellipse(r*0.45,-r*0.07,r*0.14,r*0.06,0,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+  // ragyogás
+  ctx.save(); ctx.globalCompositeOperation='lighter'; const gg=ctx.createRadialGradient(sh.x,sh.y,0,sh.x,sh.y,r*2.6); gg.addColorStop(0,hexA(sh.col,0.25)); gg.addColorStop(1,hexA(sh.col,0));
+  ctx.fillStyle=gg; ctx.beginPath(); ctx.arc(sh.x,sh.y,r*2.6,0,Math.PI*2); ctx.fill(); ctx.restore();
+}
+function drawPaddle(i){
+  const p=paddles[i], x=i?CW-PX:PX, col=i?'#ff5ad1':'#3ef0ff', f=Math.max(0,p.flash/0.18);
+  ctx.save(); ctx.globalCompositeOperation='lighter';
+  const g=ctx.createLinearGradient(x-4,0,x+4,0); g.addColorStop(0,hexA(col,0)); g.addColorStop(0.5,hexA(col,0.25+0.4*f)); g.addColorStop(1,hexA(col,0));
+  ctx.fillStyle=g; ctx.fillRect(x-4.5,p.y-PH-2,9,PH*2+4); ctx.restore();
+  // energiapajzs: ívelt fénysáv + emitter végek
+  ctx.strokeStyle=f>0?'#ffffff':col; ctx.lineWidth=PT*0.7; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(x,p.y-PH); ctx.quadraticCurveTo(x+(i?-1.6:1.6),p.y,x,p.y+PH); ctx.stroke();
+  ctx.fillStyle='#c9d0ff'; for(const e of [-1,1]){ ctx.beginPath(); ctx.arc(x,p.y+e*PH,1.3,0,Math.PI*2); ctx.fill(); }
+  ctx.fillStyle=col; ctx.beginPath(); ctx.arc(x+(i?1.6:-1.6),p.y,1.1,0,Math.PI*2); ctx.fill();
+}
+function render(){
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  // háttér: köd + csillagok (képernyő-térben)
+  const bg=ctx.createRadialGradient(W*0.3,H*0.3,0,W*0.5,H*0.5,Math.max(W,H)*0.8); bg.addColorStop(0,'#14164a'); bg.addColorStop(0.5,'#0a0b26'); bg.addColorStop(1,'#05060f');
+  ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
+  const neb=ctx.createRadialGradient(W*0.78,H*0.72,0,W*0.78,H*0.72,Math.min(W,H)*0.5); neb.addColorStop(0,'rgba(255,90,209,.12)'); neb.addColorStop(1,'rgba(255,90,209,0)'); ctx.fillStyle=neb; ctx.fillRect(0,0,W,H);
+  const drift=time*0.01*(1+intensity()*0.6);
+  for(const st of stars){ const x=((st.x-drift*st.z)%1+1)%1*W, y=st.y*H, a=0.35+0.65*Math.abs(Math.sin(time*0.8+st.tw));
+    ctx.fillStyle=`rgba(220,228,255,${a*st.z})`; ctx.fillRect(x,y,st.z*1.8,st.z*1.8); }
+  if(state==='menu') return;
+  // pálya
+  ctx.save();
+  let m=M; if(shake>0){ m=new DOMMatrix().translate((Math.random()-0.5)*shake*14*dpr,(Math.random()-0.5)*shake*14*dpr).multiply(M); }
+  ctx.setTransform(m);
+  ctx.fillStyle='rgba(10,14,46,.55)'; ctx.fillRect(0,0,CW,CH);
+  ctx.strokeStyle='rgba(120,140,255,.08)'; ctx.lineWidth=0.25; for(let x=10;x<CW;x+=10){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,CH); ctx.stroke(); } for(let y=10;y<CH;y+=10){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(CW,y); ctx.stroke(); }
+  ctx.setLineDash([2.5,2.5]); ctx.strokeStyle='rgba(200,210,255,.25)'; ctx.lineWidth=0.6; ctx.beginPath(); ctx.moveTo(CW/2,0); ctx.lineTo(CW/2,CH); ctx.stroke(); ctx.setLineDash([]);
+  ctx.save(); ctx.globalCompositeOperation='lighter'; for(const y of [0,CH]){ const g=ctx.createLinearGradient(0,y-3,0,y+3); g.addColorStop(0,'rgba(157,140,255,0)'); g.addColorStop(0.5,'rgba(157,140,255,.7)'); g.addColorStop(1,'rgba(157,140,255,0)'); ctx.fillStyle=g; ctx.fillRect(0,y-3,CW,6); } ctx.restore();
+  ctx.strokeStyle='rgba(62,240,255,.25)'; ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(0,CH); ctx.stroke(); ctx.strokeStyle='rgba(255,90,209,.25)'; ctx.beginPath(); ctx.moveTo(CW,0); ctx.lineTo(CW,CH); ctx.stroke();
+  // részecskék
+  ctx.save(); ctx.globalCompositeOperation='lighter';
+  for(const p of parts){ if(p.life<=0) continue; const a=p.life/p.max; ctx.fillStyle=hexA(p.col,a*(p.type==='trail'?0.5:1)); ctx.beginPath(); ctx.arc(p.x,p.y,p.size*(p.type==='trail'?a:1),0,Math.PI*2); ctx.fill(); }
+  ctx.restore();
+  drawPaddle(0); drawPaddle(1);
+  for(const sh of ships) drawShip(sh);
+  ctx.restore();
+  // HUD (képernyő-térben)
+  ctx.setTransform(dpr,0,0,dpr,0,0); ctx.textAlign='center'; ctx.textBaseline='middle';
+  const sc=Math.min(42,Math.max(26,Math.min(W,H)*0.07));
+  ctx.font=`800 ${sc}px Orbitron, sans-serif`;
+  const lbl=mode==='cpu'?['TE',AI[level].name.toUpperCase()]:['BAL','JOBB'];
+  if(portrait){ hud(score[1],W/2,32+env('top'),'#ff5ad1',sc,lbl[1],true); hud(score[0],W/2,H-30,'#3ef0ff',sc,lbl[0],false); }
+  else { hud(score[0],W/2-W*0.12,30,'#3ef0ff',sc,lbl[0],false); hud(score[1],W/2+W*0.12,30,'#ff5ad1',sc,lbl[1],false); }
+  ctx.font=`600 13px "Exo 2", sans-serif`; ctx.fillStyle='rgba(232,236,255,.6)';
+  ctx.fillText('🚀 × '+ships.length,W/2,portrait?H/2-CW*s/2-12:30);
+  // visszaszámlálás + banner
+  if(state==='count'){ const n=Math.ceil(countdown); ctx.font=`800 ${sc*2.2}px Orbitron, sans-serif`; ctx.fillStyle=hexA('#ffd166',0.4+0.6*(countdown%1)); ctx.fillText(n>0?n:'',W/2,H/2); }
+  const ba=time-banner.t; if(ba>=0&&ba<0.9){ ctx.globalAlpha=1-ba/0.9; ctx.font=`800 ${sc*0.6}px Orbitron, sans-serif`; ctx.fillStyle=banner.col; ctx.fillText(banner.text,W/2,H/2+(portrait?-W*0.18:H*0.2)-ba*20); ctx.globalAlpha=1; }
+}
+function hud(v,x,y,col,sc,lbl,top){ ctx.fillStyle=col; ctx.shadowColor=col; ctx.shadowBlur=16; ctx.font=`800 ${sc}px Orbitron, sans-serif`; ctx.fillText(v,x,y+(top?8:0)); ctx.shadowBlur=0;
+  ctx.font=`600 11px "Exo 2", sans-serif`; ctx.fillStyle='rgba(232,236,255,.55)'; ctx.fillText(lbl,x,y+(top?8+sc*0.62:-sc*0.62)); }
+function env(){ return 0; }
+function hexA(hex,a){ const n=parseInt(hex.slice(1),16); return `rgba(${n>>16},${(n>>8)&255},${n&255},${a})`; }
+
+// ================= CIKLUS =================
+let last=performance.now();
+function frame(ms){
+  let dt=(ms-last)/1000; last=ms; if(dt>0.05) dt=0.05;
+  if(state!=='paused') time+=dt;
+  musicTick();
+  if(state==='count'){
+    updatePaddles(dt); countdown-=dt; const n=Math.ceil(countdown);
+    if(n<lastCountShown&&n>0){ lastCountShown=n; sCount(false); }
+    if(countdown<=0){ state='play'; sCount(true); serve(); serveAt=time+99; }
+  } else if(state==='play'){
+    updatePaddles(dt);
+    const sub=Math.ceil(dt/(1/240)); for(let k=0;k<sub&&state==='play';k++) stepShips(dt/sub);
+    if(state==='play'&&!ships.length&&time>=serveAt){ serve(); serveAt=time+99; }
+  }
+  if(shake>0) shake=Math.max(0,shake-dt);
+  for(const p of parts) if(p.life>0){ p.life-=dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vx*=0.98; p.vy*=0.98; }
+  if(W) render();
+  requestAnimationFrame(frame);
+}
+
+// ================= BEMENET =================
+const keys={};
+function updKeys(){
+  const up0=keys.KeyW||keys.KeyA, dn0=keys.KeyS||keys.KeyD, up1=keys.ArrowUp||keys.ArrowLeft, dn1=keys.ArrowDown||keys.ArrowRight;
+  if(mode==='cpu'){ paddles[0].keyDir=((dn0||dn1)?1:0)-((up0||up1)?1:0); if(up0||dn0||up1||dn1) paddles[0].target=null; }
+  else { paddles[0].keyDir=(dn0?1:0)-(up0?1:0); paddles[1].keyDir=(dn1?1:0)-(up1?1:0); if(up0||dn0) paddles[0].target=null; if(up1||dn1) paddles[1].target=null; }
+}
+window.addEventListener('keydown',e=>{
+  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) e.preventDefault();
+  if(e.code==='KeyP'||e.code==='Escape'){ state==='paused'?resume():pause(); return; }
+  keys[e.code]=true; updKeys();
+});
+window.addEventListener('keyup',e=>{ keys[e.code]=false; updKeys(); });
+const ptrSide={};
+function ptr(e){
+  if(!(state==='play'||state==='count')) return;
+  const p=toLogical(e.clientX,e.clientY);
+  let side=ptrSide[e.pointerId]; if(side===undefined){ side=mode==='cpu'?0:(p.x<CW/2?0:1); ptrSide[e.pointerId]=side; }
+  paddles[side].target=Math.max(PH,Math.min(CH-PH,p.y));
+}
+cv.addEventListener('pointerdown',e=>{ e.preventDefault(); delete ptrSide[e.pointerId]; ptr(e); });
+cv.addEventListener('pointermove',e=>{ if(e.pointerType==='mouse'||e.buttons) ptr(e); });
+cv.addEventListener('pointerup',e=>{ delete ptrSide[e.pointerId]; });
+document.querySelectorAll('[data-lv]').forEach(b=>b.addEventListener('click',()=>startGame('cpu',+b.dataset.lv)));
+document.getElementById('twoBtn').addEventListener('click',()=>startGame('two'));
+document.getElementById('againBtn').addEventListener('click',()=>startGame(mode,level));
+document.getElementById('resumeBtn').addEventListener('click',resume);
+document.getElementById('menuBtn').addEventListener('click',toMenu);
+document.getElementById('menuBtn2').addEventListener('click',toMenu);
+document.getElementById('muteBtn').addEventListener('click',e=>{ muted=!muted; e.currentTarget.textContent=muted?'🔇':'🔊'; e.currentTarget.setAttribute('aria-pressed',String(muted)); if(master) master.gain.value=muted?0:0.85; e.currentTarget.blur(); });
+document.getElementById('musicBtn').addEventListener('click',e=>{ musicOn=!musicOn; e.currentTarget.style.opacity=musicOn?1:0.5; e.currentTarget.setAttribute('aria-pressed',String(musicOn)); if(musBus) musBus.gain.value=musicOn?0.55:0; initAudio(); startMusic(); e.currentTarget.blur(); });
+document.addEventListener('visibilitychange',()=>{ if(document.hidden) pause(); });
+window.addEventListener('blur',()=>{ for(const k in keys) keys[k]=false; updKeys(); pause(); });
+window.addEventListener('resize',resize);
+resize(); requestAnimationFrame(frame);
+</script>

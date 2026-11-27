@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="hu">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Sütikígyó</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chewy&family=Nunito:wght@600;800&display=swap">
+<style>
+/* Layout: teljes képernyős vászon: felül pontsáv, középen az erdei tisztás-pálya, alul a szurkoló állatok; érintőképernyőn d-pad */
+[hidden]{display:none!important}
+:root{
+  --bg:#1f2a1c; --panel:#f5ecd7; --ink:#3a2a1a; --muted:#7a6a55; --moss:#6fa14a; --leaf:#3f7a35;
+  --berry:#c8346b; --honey:#f2b632; --bark:#6b4a2e;
+  --display:'Chewy','Comic Sans MS',cursive; --body:'Nunito',system-ui,sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%;overflow:hidden;margin:0}
+body{background:var(--bg);color:var(--panel);font-family:var(--body)}
+.game{position:fixed;inset:0;display:flex;flex-direction:column;
+  padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
+canvas{display:block;flex:1;min-height:0;width:100%;touch-action:none;user-select:none;-webkit-user-select:none}
+.pad{display:none;justify-content:center;padding-block:6px 10px;gap:0}
+@media (pointer:coarse){.pad{display:flex}}
+.pad .g{display:grid;grid-template-columns:repeat(3,58px);grid-template-rows:repeat(2,50px);gap:6px}
+.pad button{margin:0;padding:0;border-radius:14px;font-size:1.4rem;background:#3d5a30;color:#f5ecd7;box-shadow:0 4px 0 #22361b;font-family:var(--body)}
+.pad button:active{transform:translateY(3px);box-shadow:0 1px 0 #22361b}
+.ov{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px;
+  background:rgba(18,26,15,.62)}
+.card{width:min(440px,100%);background:var(--panel);color:var(--ink);border-radius:22px;padding:22px 20px 20px;text-align:center;
+  border:4px solid var(--bark);box-shadow:0 8px 0 #4a321d,0 22px 50px rgba(0,0,0,.45);position:relative}
+.card::before{content:"🍃";position:absolute;top:-22px;left:50%;transform:translateX(-50%) rotate(-12deg);font-size:2rem}
+h1{font-family:var(--display);font-weight:400;font-size:clamp(2.2rem,9vw,3.1rem);margin:4px 0 2px;color:var(--leaf);line-height:1;text-wrap:balance}
+.tag{margin:6px 0 12px;color:var(--muted);font-size:1rem;text-wrap:balance}
+.rules{display:grid;gap:6px;text-align:left;margin:0 auto 6px;max-width:330px;font-size:.95rem}
+.rules div{display:flex;gap:8px;align-items:flex-start}
+.small{font-size:.85rem;color:var(--muted);margin:8px 0 0}
+button{font-family:var(--display);font-size:1.45rem;border:0;border-radius:999px;padding:10px 34px;cursor:pointer;margin-top:14px;
+  color:#fff;background:var(--berry);box-shadow:0 5px 0 #8a1f47,0 10px 20px rgba(0,0,0,.25);transition:transform .07s,box-shadow .07s}
+button:active{transform:translateY(4px);box-shadow:0 1px 0 #8a1f47}
+button:focus-visible{outline:3px solid var(--honey);outline-offset:3px}
+button.ghost{font-family:var(--body);font-weight:800;font-size:.9rem;padding:8px 16px;background:#e5d9bd;color:var(--ink);box-shadow:0 3px 0 #b9a985}
+.mute{position:absolute;right:max(10px,env(safe-area-inset-right,0px));top:calc(8px + env(safe-area-inset-top,0px));margin:0;z-index:5}
+.big{font-family:var(--display);font-size:3rem;color:var(--berry);line-height:1;margin:4px 0}
+.row{display:flex;justify-content:center;gap:18px;font-weight:800;color:var(--muted);font-variant-numeric:tabular-nums}
+.row b{color:var(--ink);font-size:1.2rem;display:block}
+</style>
+
+<div class="game">
+  <canvas id="cv"></canvas>
+  <div class="pad" id="pad"><div class="g">
+    <span></span><button data-d="0,-1" aria-label="Fel">▲</button><span></span>
+    <button data-d="-1,0" aria-label="Balra">◀</button><button data-d="0,1" aria-label="Le">▼</button><button data-d="1,0" aria-label="Jobbra">▶</button>
+  </div></div>
+
+  <div class="ov" id="titleOv">
+    <div class="card">
+      <h1>Sütikígyó</h1>
+      <p class="tag">Az erdei tisztásra cukrászsütik potyognak. Edd meg őket, nőj nagyra, de kerüld el a morcos viperát!</p>
+      <div class="rules">
+        <div>🍩 <span>Minden süti növeszt. Gyors evésért dupla pont jár.</span></div>
+        <div>✨ <span>Az arany Dobos-szelet csak pár másodpercig marad.</span></div>
+        <div>🐍 <span>A lila vipera kiszámíthatatlanul kóborol, és néha ellopja a sütit. Ne menj neki!</span></div>
+        <div>🌳 <span>A bokrok szélének és a saját farkadnak se ütközz.</span></div>
+      </div>
+      <p class="small">Nyilak / WASD, telefonon húzás vagy a gombok. P: szünet.</p>
+      <p class="small" id="hiLine"></p>
+      <button id="startBtn">Indulás!</button>
+    </div>
+  </div>
+
+  <div class="ov" id="pauseOv" hidden>
+    <div class="card"><h1>Szundi</h1><p class="tag">A kígyó összegömbölyödött egy kicsit. Az állatok várnak.</p><button id="resumeBtn">Tovább</button></div>
+  </div>
+
+  <div class="ov" id="overOv" hidden>
+    <div class="card">
+      <p class="small" style="margin:0" id="deathWhy">Hoppá!</p>
+      <div class="big" id="oScore">0</div>
+      <div class="row"><div>hossz<b id="oLen">0</b></div><div>süti<b id="oEat">0</b></div><div>rekord<b id="oHi">0</b></div></div>
+      <p class="tag" id="oQuip"></p>
+      <button id="againBtn">Újra!</button>
+    </div>
+  </div>
+
+  <button class="ghost mute" id="muteBtn" aria-pressed="false">🔊</button>
+</div>
+
+<script>
+// ================= KONFIG =================
+const N=20;                                  // pálya: N×N cella
+const TICK0=0.16, TICK_MIN=0.075, TICK_DEC=0.0035;
+const ENEMY_LEN0=5, ENEMY_MAXLEN=14;
+const COMBO_WINDOW=3.0, BONUS_LIFE=6, BONUS_CHANCE=0.22;
+const PASTRIES=[ // név, pont
+  {k:'fank',name:'fánk',pts:10},{k:'muffin',name:'muffin',pts:10},{k:'kifli',name:'vajas kifli',pts:12},
+  {k:'macaron',name:'macaron',pts:15},{k:'kremes',name:'krémes',pts:20},{k:'torta',name:'tortaszelet',pts:20}];
+const QUIPS=['A vipera elégedetten sziszeg.','A süni elhatározta, hogy ezentúl ő is diétázik.','A róka sírva fakadt. Még a farkát is törölgeti vele.',
+  'A mókus azt mondja, legközelebb tuti sikerül!','A nyuszi már keresi a habtejszínt a következő körre.'];
+
+// ================= ÁLLAPOT =================
+const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+let W=0,H=0,dpr=1, cell=20, bx=0, by=0, hudH=0, audY=0, audH=0, boardImg=null;
+let state='title', time=0, acc=0, tick=TICK0, tickT=0;
+let snake=[], prev=[], dir={x:1,y:0}, queue=[], grow=0;
+let enemy=null, foods=[], score=0, eaten=0, lastEat=-99, combo=1, deathT=0, deathWhy='';
+let shake=0, floaters=[], mood={t:-9,kind:'idle'}, scaredUntil=0, lastHiss=-9, nextBird=3;
+let hi=0; try{hi=+localStorage.getItem('sutikigyo-hi')||0}catch(e){}
+const parts=[]; for(let i=0;i<260;i++) parts.push({life:0});
+
+// ================= HANG =================
+let ac=null, master=null, noiseBuf=null, muted=false;
+function initAudio(){
+  if(ac){ if(ac.state==='suspended') ac.resume(); return; }
+  try{ ac=new (window.AudioContext||window.webkitAudioContext)(); master=ac.createGain(); master.gain.value=muted?0:0.8; master.connect(ac.destination);
+    noiseBuf=ac.createBuffer(1,ac.sampleRate,ac.sampleRate); const d=noiseBuf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
+  }catch(e){ ac=null; }
+}
+function envG(t,peak,att,dec){ const g=ac.createGain(); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(peak,t+att); g.gain.exponentialRampToValueAtTime(0.0001,t+att+dec); g.connect(master); return g; }
+function tone(t,type,f0,f1,dur,peak,slide){ if(!ac) return; const o=ac.createOscillator(); o.type=type; o.frequency.setValueAtTime(f0,t); o.frequency.exponentialRampToValueAtTime(f1,t+(slide||dur)); o.connect(envG(t,peak,0.005,dur)); o.start(t); o.stop(t+dur+0.05); }
+function nz(t,dur,type,f,q,peak){ if(!ac) return; const n=ac.createBufferSource(); n.buffer=noiseBuf; const fl=ac.createBiquadFilter(); fl.type=type; fl.frequency.value=f; if(q) fl.Q.value=q; n.connect(fl).connect(envG(t,peak,0.003,dur)); n.start(t,Math.random()*0.5); n.stop(t+dur+0.05); }
+const now=()=>ac?ac.currentTime:0;
+function sMunch(){ if(!ac||muted) return; const t=now(); for(let k=0;k<3;k++) nz(t+k*0.055,0.04,'bandpass',1400+Math.random()*1200,2,0.35); tone(t,'sine',520,880,0.09,0.25); }
+function sBonus(){ if(!ac||muted) return; const t=now(); [784,988,1175,1568].forEach((f,k)=>tone(t+k*0.07,'triangle',f,f,0.18,0.2)); }
+function sSteal(){ if(!ac||muted) return; const t=now(); tone(t,'square',520,260,0.25,0.12,0.25); tone(t+0.12,'square',390,180,0.3,0.1,0.3); }
+function sHiss(){ if(!ac||muted) return; const t=now(); nz(t,0.45,'highpass',3500,0,0.18); }
+function sDeath(){ if(!ac||muted) return; const t=now(); tone(t,'sine',420,70,0.8,0.35,0.8); tone(t+0.05,'triangle',300,60,0.6,0.2,0.6); nz(t,0.15,'lowpass',500,0,0.5); }
+function sBurrow(){ if(!ac||muted) return; const t=now(); nz(t,0.3,'lowpass',260,0,0.5); tone(t,'sine',120,50,0.25,0.3); }
+function sStart(){ if(!ac||muted) return; const t=now(); [523,659,784,1047].forEach((f,k)=>tone(t+k*0.09,'triangle',f,f,0.14,0.18)); }
+function sBird(){ if(!ac||muted) return; const t=now(), b=2200+Math.random()*1600, n=2+Math.floor(Math.random()*4);
+  for(let k=0;k<n;k++){ const s=t+k*0.11; tone(s,'sine',b*(1+Math.random()*0.15),b*(1.25+Math.random()*0.3),0.07,0.045,0.06); } }
+
+// ================= JÁTÉKLOGIKA =================
+const key=(x,y)=>x+','+y;
+const inside=(x,y)=>x>=0&&y>=0&&x<N&&y<N;
+function occupied(x,y,opts={}){
+  for(const s of snake) if(s.x===x&&s.y===y) return true;
+  if(enemy&&!enemy.burrowed) for(const s of enemy.segs) if(s.x===x&&s.y===y) return true;
+  if(!opts.noFood) for(const f of foods) if(f.x===x&&f.y===y) return true;
+  return false;
+}
+function freeCell(minDistFromHead=0){
+  const h=snake[0]||{x:N/2,y:N/2};
+  for(let tries=0;tries<500;tries++){
+    const x=Math.floor(Math.random()*N), y=Math.floor(Math.random()*N);
+    if(occupied(x,y)) continue; if(Math.abs(x-h.x)+Math.abs(y-h.y)<minDistFromHead) continue; return {x,y};
+  }
+  return null;
+}
+function spawnFood(bonus=false){
+  const c=freeCell(2); if(!c) return;
+  const p=bonus?{k:'dobos',name:'arany Dobos-szelet',pts:60}:PASTRIES[Math.floor(Math.random()*PASTRIES.length)];
+  foods.push({...c,...p,bonus,born:time});
+}
+function makeEnemy(){
+  // a kígyó fejétől távol, jelzett vakondtúrásból bújik elő
+  let c=null; for(let k=0;k<200&&!c;k++){ const t=freeCell(9); if(t&&t.x>1&&t.y>1&&t.x<N-2&&t.y<N-2) c=t; }
+  if(!c) c=freeCell(4)||{x:2,y:2};
+  return {segs:[],prev:[],dir:{x:0,y:-1},len:Math.min(ENEMY_MAXLEN,(enemy?enemy.len:ENEMY_LEN0)),burrowed:true,emergeAt:time+1.4,hole:c,phase:0,hunting:false};
+}
+function startGame(){
+  initAudio();
+  const mid=Math.floor(N/2);
+  snake=[{x:mid-1,y:mid},{x:mid-2,y:mid},{x:mid-3,y:mid}]; prev=snake.map(s=>({...s}));
+  dir={x:1,y:0}; queue=[]; grow=0; score=0; eaten=0; combo=1; lastEat=-99; tick=TICK0; tickT=0; acc=0; time=0;
+  foods=[]; enemy=null; spawnFood(); enemy=makeEnemy(); floaters=[]; mood={t:-9,kind:'idle'}; nextBird=2;
+  state='play'; show('titleOv',false); show('overOv',false); show('pauseOv',false); sStart();
+}
+function turn(dx,dy){
+  if(state!=='play') return;
+  const last=queue.length?queue[queue.length-1]:dir;
+  if(dx===-last.x&&dy===-last.y) return; if(dx===last.x&&dy===last.y) return;
+  if(queue.length<2) queue.push({x:dx,y:dy});
+}
+function enemyStepEvery(){ const L=snake.length; return L<10?2:L<18?1.5:1; }
+function enemyPlan(nextHead){
+  const e=enemy, h=e.segs[0], dirs=[{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}];
+  const opts=[];
+  for(const d of dirs){
+    if(d.x===-e.dir.x&&d.y===-e.dir.y) continue;
+    const x=h.x+d.x, y=h.y+d.y;
+    if(!inside(x,y)) continue;
+    if(e.segs.some((s,i)=>i<e.segs.length-1&&s.x===x&&s.y===y)) continue;
+    if(snake.some(s=>s.x===x&&s.y===y)) continue;
+    if(Math.abs(x-nextHead.x)+Math.abs(y-nextHead.y)<=1) continue;   // tisztesség: sosem ugrik közvetlenül a játékos feje elé
+    let w=(d.x===e.dir.x&&d.y===e.dir.y)?3:1;
+    if(e.hunting&&foods[0]){ const f=foods[0]; if(Math.abs(f.x-x)+Math.abs(f.y-y)<Math.abs(f.x-h.x)+Math.abs(f.y-h.y)) w*=4; }
+    if(x===0||y===0||x===N-1||y===N-1) w*=0.4;
+    opts.push({d,w});
+  }
+  if(!opts.length) return null;
+  let r=Math.random()*opts.reduce((a,o)=>a+o.w,0);
+  for(const o of opts){ r-=o.w; if(r<=0) return o.d; } return opts[opts.length-1].d;
+}
+function step(){
+  // --- játékos ---
+  if(queue.length) dir=queue.shift();
+  const h=snake[0], nh={x:h.x+dir.x,y:h.y+dir.y};
+  prev=snake.map(s=>({...s}));
+  // --- ellenség terve (a játékos új fejét is figyelembe veszi) ---
+  let eMove=false;
+  if(enemy&&!enemy.burrowed){
+    enemy.phase+=1; const every=enemyStepEvery();
+    if(enemy.phase>=every){ enemy.phase-=every; eMove=true; }
+    if(Math.random()<0.02) enemy.hunting=!enemy.hunting;
+  }
+  // ütközések
+  if(!inside(nh.x,nh.y)) return die('Belecsúsztál a csipkebokorba!');
+  const willGrow=grow>0;
+  for(let i=0;i<snake.length-(willGrow?0:1);i++) if(snake[i].x===nh.x&&snake[i].y===nh.y) return die('Megharaptad a saját farkad!');
+  if(enemy&&!enemy.burrowed) for(const s of enemy.segs) if(s.x===nh.x&&s.y===nh.y) return die('Nekimentél a viperának!');
+  snake.unshift(nh); if(grow>0) grow--; else snake.pop();
+  // evés
+  for(let i=foods.length-1;i>=0;i--){ const f=foods[i]; if(f.x===nh.x&&f.y===nh.y){ eat(f); foods.splice(i,1); } }
+  if(!foods.some(f=>!f.bonus)) spawnFood();
+  // --- ellenség lépése ---
+  if(enemy){
+    if(enemy.burrowed){ if(time>=enemy.emergeAt){ if(occupied(enemy.hole.x,enemy.hole.y,{noFood:true})) enemy.emergeAt=time+0.5; else { enemy.burrowed=false; enemy.segs=[{...enemy.hole}]; enemy.prev=[{...enemy.hole}]; enemy.dir={x:0,y:-1}; sBurrow(); } } }
+    else if(eMove){
+      const d=enemyPlan(nh);
+      enemy.prev=enemy.segs.map(s=>({...s}));
+      if(!d){ burrow(); }
+      else{
+        enemy.dir=d; const eh={x:enemy.segs[0].x+d.x,y:enemy.segs[0].y+d.y};
+        enemy.segs.unshift(eh); if(enemy.segs.length>enemy.len) enemy.segs.pop();
+        for(let i=foods.length-1;i>=0;i--){ const f=foods[i]; if(f.x===eh.x&&f.y===eh.y){ foods.splice(i,1); enemy.len=Math.min(ENEMY_MAXLEN,enemy.len+1); enemy.hunting=false;
+          float(f.x,f.y,'Ellopta! 😠','#c8346b'); sSteal(); setMood('sad'); burstCells(f.x,f.y,'#d9a86c',12); if(!foods.some(q=>!q.bonus)) spawnFood(); } }
+      }
+    } else enemy.prev=enemy.segs.map(s=>({...s}));
+    // sziszegés, ha közel van
+    if(!enemy.burrowed&&enemy.segs.length){ const e=enemy.segs[0], d=Math.abs(e.x-nh.x)+Math.abs(e.y-nh.y);
+      if(d<=3){ scaredUntil=time+0.6; if(time-lastHiss>1.4){ lastHiss=time; sHiss(); } } }
+  }
+}
+function burrow(){ sBurrow(); burstCells(enemy.segs[0].x,enemy.segs[0].y,'#6b4a2e',14); const len=enemy.len; enemy=makeEnemy(); enemy.len=len; }
+function eat(f){
+  const quick=time-lastEat<COMBO_WINDOW; combo=quick?Math.min(4,combo+1):1; lastEat=time;
+  const pts=f.pts*combo; score+=pts; eaten++; grow+=f.bonus?3:1;
+  tick=Math.max(TICK_MIN,tick-TICK_DEC);
+  float(f.x,f.y,'+'+pts+(combo>1?' ×'+combo:''),f.bonus?'#f2b632':'#fff6e0');
+  burstCells(f.x,f.y,f.bonus?'#f2b632':'#f3c98b',f.bonus?24:14);
+  if(f.bonus){ sBonus(); setMood('cheer'); } else { sMunch(); setMood('happy'); }
+  if(!f.bonus&&Math.random()<BONUS_CHANCE&&!foods.some(q=>q.bonus)) spawnFood(true);
+}
+function die(why){
+  state='dying'; deathT=time; deathWhy=why; shake=0.5; sDeath(); setMood('sad');
+  const h=snake[0]; burstCells(h.x,h.y,'#8bc34a',26);
+}
+function finish(){
+  state='over';
+  if(score>hi){ hi=score; try{localStorage.setItem('sutikigyo-hi',String(hi))}catch(e){} }
+  const $=id=>document.getElementById(id);
+  $('deathWhy').textContent=deathWhy; $('oScore').textContent=score; $('oLen').textContent=snake.length; $('oEat').textContent=eaten; $('oHi').textContent=hi;
+  $('oQuip').textContent=QUIPS[Math.floor(Math.random()*QUIPS.length)];
+  show('overOv',true); updateHi();
+}
+function setMood(kind){ mood={kind,t:time}; }
+function float(x,y,text,col){ floaters.push({x,y,text,col,t:time}); if(floaters.length>8) floaters.shift(); }
+function pause(){ if(state!=='play') return; state='paused'; show('pauseOv',true); if(ac) ac.suspend(); }
+function resume(){ if(state!=='paused') return; state='play'; show('pauseOv',false); if(ac) ac.resume(); }
+function show(id,v){ document.getElementById(id).hidden=!v; }
+function updateHi(){ document.getElementById('hiLine').textContent=hi>0?'Rekord: '+hi+' pont':''; }
+
+// ================= RÉSZECSKÉK =================
+function spawnP(x,y,vx,vy,life,col,size){ for(const p of parts) if(p.life<=0){ Object.assign(p,{x,y,vx,vy,life,max:life,col,size}); return; } }
+function burstCells(cx,cy,col,n){ const x=bx+(cx+0.5)*cell, y=by+(cy+0.5)*cell;
+  for(let i=0;i<n;i++){ const a=Math.random()*Math.PI*2, v=40+Math.random()*160; spawnP(x,y,Math.cos(a)*v,Math.sin(a)*v-60,0.5+Math.random()*0.4,i%4?col:'#fff6e0',2+Math.random()*3); } }
+
+// ================= RAJZ: PÁLYA =================
+function resize(){
+  dpr=Math.min(window.devicePixelRatio||1,2);
+  W=cv.clientWidth; H=cv.clientHeight; cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr); ctx.setTransform(dpr,0,0,dpr,0,0);
+  hudH=Math.max(40,Math.min(56,H*0.07)); audH=Math.max(54,Math.min(96,H*0.13));
+  const avail=Math.min(W-28,H-hudH-audH-28);
+  cell=Math.max(8,Math.floor(avail/N)); const size=cell*N;
+  bx=Math.round((W-size)/2); by=Math.round(hudH+(H-hudH-audH-size)/2); audY=by+size+10;
+  buildBoard();
+}
+function rng(s){ return ()=>{ s=(s*16807)%2147483647; return s/2147483647; }; }
+function buildBoard(){
+  const pad=cell*1.2, size=cell*N, oc=document.createElement('canvas');
+  oc.width=Math.ceil((size+pad*2)*dpr); oc.height=Math.ceil((size+pad*2)*dpr);
+  const g=oc.getContext('2d'); g.scale(dpr,dpr); g.translate(pad,pad); const R=rng(7);
+  // bokorkeret
+  for(let k=0;k<N*4+8;k++){ const side=k%4, t=(Math.floor(k/4)+R())/(N+2)*size;
+    const x=side===0?t:side===1?size+pad*0.45:side===2?t:-pad*0.45, y=side===0?-pad*0.45:side===1?t:side===2?size+pad*0.45:t;
+    const r=cell*(0.55+R()*0.4); g.fillStyle=['#2f5e2a','#3c7033','#2a5226'][Math.floor(R()*3)];
+    g.beginPath(); g.arc(x,y,r,0,Math.PI*2); g.fill();
+    if(R()<0.25){ g.fillStyle='#c8346b'; g.beginPath(); g.arc(x+r*0.3,y-r*0.2,cell*0.09,0,Math.PI*2); g.fill(); } }
+  // mohás kockák
+  for(let y=0;y<N;y++) for(let x=0;x<N;x++){ g.fillStyle=(x+y)%2?'#7cb257':'#74a951'; g.fillRect(x*cell,y*cell,cell,cell); }
+  // apró díszek: lóhere, virág, falevél
+  for(let k=0;k<N*3;k++){ const x=R()*size, y=R()*size, t=R();
+    if(t<0.4){ g.fillStyle='rgba(60,110,40,.55)'; for(let a=0;a<3;a++){ g.beginPath(); g.arc(x+Math.cos(a*2.1)*cell*0.1,y+Math.sin(a*2.1)*cell*0.1,cell*0.09,0,Math.PI*2); g.fill(); } }
+    else if(t<0.7){ g.fillStyle=['#fff4d6','#ffd6e5','#e2d4ff'][Math.floor(R()*3)]; for(let a=0;a<5;a++){ g.beginPath(); g.arc(x+Math.cos(a*1.26)*cell*0.07,y+Math.sin(a*1.26)*cell*0.07,cell*0.05,0,Math.PI*2); g.fill(); } g.fillStyle='#f2b632'; g.beginPath(); g.arc(x,y,cell*0.04,0,Math.PI*2); g.fill(); }
+    else { g.save(); g.translate(x,y); g.rotate(R()*6); g.fillStyle=['rgba(200,120,40,.55)','rgba(170,80,30,.5)','rgba(220,170,60,.5)'][Math.floor(R()*3)]; g.beginPath(); g.ellipse(0,0,cell*0.16,cell*0.07,0,0,Math.PI*2); g.fill(); g.restore(); } }
+  boardImg={img:oc,pad};
+}
+
+// ================= RAJZ: SÜTIK =================
+function drawPastry(f,t){
+  const cx=bx+(f.x+0.5)*cell, cy=by+(f.y+0.5)*cell+Math.sin(t*3+f.x)*cell*0.05, r=cell*0.42;
+  ctx.save(); ctx.translate(cx,cy);
+  ctx.fillStyle='rgba(0,0,0,.18)'; ctx.beginPath(); ctx.ellipse(0,r*0.8,r*0.8,r*0.22,0,0,Math.PI*2); ctx.fill();
+  const O='#5a3a20'; ctx.lineWidth=Math.max(1.2,cell*0.05); ctx.strokeStyle=O;
+  switch(f.k){
+    case 'fank': ctx.fillStyle='#e0a35e'; ctx.beginPath(); ctx.arc(0,0,r*0.9,0,Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle='#f28cb8'; ctx.beginPath(); for(let a=0;a<12;a++){ const rr=r*(0.78+(a%2)*0.08), aa=a/12*Math.PI*2; ctx.lineTo(Math.cos(aa)*rr,Math.sin(aa)*rr); } ctx.closePath(); ctx.fill();
+      ctx.fillStyle='#74a951'; ctx.beginPath(); ctx.arc(0,0,r*0.28,0,Math.PI*2); ctx.fill(); ctx.stroke();
+      ['#fff','#6cc3ff','#ffd23f','#7be07b'].forEach((c,k)=>{ ctx.fillStyle=c; for(let j=0;j<2;j++){ const a=k*1.6+j*3.1; ctx.save(); ctx.rotate(a); ctx.fillRect(r*0.5,-1,r*0.16,2.2); ctx.restore(); } }); break;
+    case 'muffin': ctx.fillStyle='#c9e2ff'; ctx.beginPath(); ctx.moveTo(-r*0.7,0); ctx.lineTo(r*0.7,0); ctx.lineTo(r*0.5,r*0.85); ctx.lineTo(-r*0.5,r*0.85); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle='#8fb4e0'; for(let k=-2;k<=2;k++){ ctx.beginPath(); ctx.moveTo(k*r*0.25,r*0.05); ctx.lineTo(k*r*0.18,r*0.8); ctx.stroke(); } ctx.strokeStyle=O;
+      ctx.fillStyle='#fff0f5'; ctx.beginPath(); ctx.arc(0,-r*0.05,r*0.75,Math.PI,0); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0,-r*0.45,r*0.42,Math.PI,0); ctx.fill(); ctx.stroke();
+      ctx.fillStyle='#d4204f'; ctx.beginPath(); ctx.arc(0,-r*0.85,r*0.17,0,Math.PI*2); ctx.fill(); ctx.stroke(); break;
+    case 'kifli': ctx.fillStyle='#e7a94f'; ctx.beginPath(); ctx.arc(0,r*0.3,r*0.9,Math.PI*1.1,Math.PI*1.9); ctx.arc(0,r*0.65,r*0.55,Math.PI*1.82,Math.PI*1.18,true); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle='#a8692a'; for(let k=-1;k<=1;k++){ ctx.beginPath(); ctx.moveTo(k*r*0.3,-r*0.55); ctx.lineTo(k*r*0.35,-r*0.12); ctx.stroke(); } break;
+    case 'macaron': ctx.fillStyle='#b6e4c0'; ctx.beginPath(); ctx.ellipse(0,-r*0.28,r*0.8,r*0.35,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle='#fff8ee'; ctx.fillRect(-r*0.72,-r*0.08,r*1.44,r*0.2);
+      ctx.fillStyle='#b6e4c0'; ctx.beginPath(); ctx.ellipse(0,r*0.32,r*0.8,r*0.35,0,0,Math.PI*2); ctx.fill(); ctx.stroke(); break;
+    case 'kremes': ctx.fillStyle='#f1d49a'; ctx.fillRect(-r*0.75,-r*0.7,r*1.5,r*0.22); ctx.strokeRect(-r*0.75,-r*0.7,r*1.5,r*0.22);
+      ctx.fillStyle='#fffbe8'; ctx.fillRect(-r*0.75,-r*0.48,r*1.5,r*0.95); ctx.strokeRect(-r*0.75,-r*0.48,r*1.5,r*0.95);
+      ctx.fillStyle='#f1d49a'; ctx.fillRect(-r*0.75,r*0.47,r*1.5,r*0.22); ctx.strokeRect(-r*0.75,r*0.47,r*1.5,r*0.22);
+      ctx.fillStyle='#ffffff'; for(let k=0;k<6;k++){ ctx.beginPath(); ctx.arc(-r*0.55+k*r*0.22,-r*0.72,r*0.05,0,Math.PI*2); ctx.fill(); } break;
+    case 'torta': ctx.beginPath(); ctx.moveTo(-r*0.8,r*0.6); ctx.lineTo(r*0.8,r*0.6); ctx.lineTo(r*0.8,-r*0.1); ctx.lineTo(-r*0.6,-r*0.55); ctx.closePath();
+      ctx.fillStyle='#ffe9c4'; ctx.fill(); ctx.stroke(); ctx.fillStyle='#8a4b2a'; ctx.fillRect(-r*0.62,r*0.05,r*1.4,r*0.14);
+      ctx.fillStyle='#f6b0c9'; ctx.beginPath(); ctx.moveTo(-r*0.6,-r*0.55); ctx.lineTo(r*0.8,-r*0.1); ctx.lineTo(r*0.8,-r*0.22); ctx.lineTo(-r*0.6,-r*0.68); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle='#d4204f'; ctx.beginPath(); ctx.arc(r*0.4,-r*0.42,r*0.14,0,Math.PI*2); ctx.fill(); break;
+    case 'dobos': { const left=1-(t-f.born)/BONUS_LIFE;
+      ctx.strokeStyle='rgba(242,182,50,.9)'; ctx.lineWidth=cell*0.08; ctx.beginPath(); ctx.arc(0,0,r*1.15,-Math.PI/2,-Math.PI/2+Math.PI*2*left); ctx.stroke(); ctx.lineWidth=Math.max(1.2,cell*0.05); ctx.strokeStyle=O;
+      ctx.fillStyle='#f7e3b0'; ctx.fillRect(-r*0.7,-r*0.35,r*1.4,r*0.95); ctx.strokeRect(-r*0.7,-r*0.35,r*1.4,r*0.95);
+      ctx.fillStyle='#6b3a1d'; for(let k=0;k<3;k++) ctx.fillRect(-r*0.7,-r*0.15+k*r*0.25,r*1.4,r*0.08);
+      ctx.fillStyle='#f2b632'; ctx.beginPath(); ctx.moveTo(-r*0.75,-r*0.35); ctx.lineTo(r*0.75,-r*0.35); ctx.lineTo(r*0.5,-r*0.7); ctx.lineTo(-r*0.5,-r*0.7); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle='#fff'; for(let k=0;k<3;k++){ const a=t*3+k*2.1; ctx.globalAlpha=0.5+0.5*Math.sin(a*2); ctx.beginPath(); ctx.arc(Math.cos(a)*r*1.1,Math.sin(a)*r*1.1,cell*0.06,0,Math.PI*2); ctx.fill(); } ctx.globalAlpha=1; break; }
+  }
+  ctx.restore();
+}
+
+// ================= RAJZ: KÍGYÓK =================
+function lerp(a,b,t){ return a+(b-a)*t; }
+function drawSnake(segs,prv,t,pal,d,isEnemy,dead){
+  if(!segs.length) return;
+  const pts=segs.map((s,i)=>{ const p=prv[i]||prv[prv.length-1]||s; return {x:bx+(lerp(p.x,s.x,t)+0.5)*cell, y:by+(lerp(p.y,s.y,t)+0.5)*cell}; });
+  const n=pts.length;
+  // test: vastag vonal elvékonyodó farokkal
+  for(let pass=0;pass<2;pass++){
+    for(let i=n-1;i>0;i--){
+      const w=cell*(0.42+0.4*(1-i/n))*(pass?1:1.18);
+      ctx.strokeStyle=pass?((i%2)?pal.a:pal.b):pal.o; ctx.lineWidth=w; ctx.lineCap='round';
+      ctx.beginPath(); ctx.moveTo(pts[i].x,pts[i].y); ctx.lineTo(pts[i-1].x,pts[i-1].y); ctx.stroke();
+    }
+  }
+  // minta
+  for(let i=1;i<n;i++){ const p=pts[i]; ctx.fillStyle=pal.spot; ctx.beginPath();
+    if(isEnemy){ ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(Math.PI/4); ctx.fillRect(-cell*0.1,-cell*0.1,cell*0.2,cell*0.2); ctx.restore(); }
+    else { ctx.arc(p.x,p.y,cell*0.09*(1-i/n*0.5),0,Math.PI*2); ctx.fill(); } }
+  // fej
+  const hd=pts[0], ang=Math.atan2(d.y,d.x), hr=cell*0.5;
+  ctx.save(); ctx.translate(hd.x,hd.y); ctx.rotate(ang);
+  // nyelv
+  const flick=(Math.sin(time*(isEnemy?9:6))>0.3);
+  if(flick&&!dead){ ctx.strokeStyle=isEnemy?'#ff2d55':'#e0457b'; ctx.lineWidth=Math.max(1.2,cell*0.06); ctx.beginPath(); ctx.moveTo(hr*0.8,0); ctx.lineTo(hr*1.4,0); ctx.lineTo(hr*1.6,-hr*0.18); ctx.moveTo(hr*1.4,0); ctx.lineTo(hr*1.6,hr*0.18); ctx.stroke(); }
+  ctx.fillStyle=pal.o; ctx.beginPath(); ctx.ellipse(0,0,hr*1.05,hr*0.85,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle=pal.a; ctx.beginPath(); ctx.ellipse(0,0,hr*0.95,hr*0.76,0,0,Math.PI*2); ctx.fill();
+  // szemek
+  for(const s of [-1,1]){
+    const ex=hr*0.25, ey=s*hr*0.38;
+    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(ex,ey,hr*0.27,0,Math.PI*2); ctx.fill();
+    if(dead){ ctx.strokeStyle='#2a1a10'; ctx.lineWidth=Math.max(1.2,cell*0.06); ctx.beginPath(); ctx.moveTo(ex-hr*0.15,ey-hr*0.15); ctx.lineTo(ex+hr*0.15,ey+hr*0.15); ctx.moveTo(ex+hr*0.15,ey-hr*0.15); ctx.lineTo(ex-hr*0.15,ey+hr*0.15); ctx.stroke(); }
+    else { ctx.fillStyle=isEnemy?'#d10f3f':'#2a1a10'; ctx.beginPath(); isEnemy?ctx.ellipse(ex+hr*0.06,ey,hr*0.06,hr*0.18,0,0,Math.PI*2):ctx.arc(ex+hr*0.08,ey,hr*0.14,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(ex+hr*0.12,ey-hr*0.06,hr*0.05,0,Math.PI*2); ctx.fill(); }
+    if(isEnemy){ ctx.strokeStyle='#2a0f2a'; ctx.lineWidth=Math.max(1.5,cell*0.08); ctx.beginPath(); ctx.moveTo(ex-hr*0.28,ey-s*hr*0.32); ctx.lineTo(ex+hr*0.25,ey-s*hr*0.12); ctx.stroke(); }
+  }
+  if(!isEnemy&&!dead){ ctx.fillStyle='rgba(255,120,140,.45)'; for(const s of [-1,1]){ ctx.beginPath(); ctx.arc(hr*0.55,s*hr*0.58,hr*0.12,0,Math.PI*2); ctx.fill(); } }
+  ctx.restore();
+}
+const PAL_ME={o:'#2f5a1f',a:'#9bd65a',b:'#86c447',spot:'#d8f2a8'};
+const PAL_EN={o:'#2a0f2a',a:'#8e4bb8',b:'#7a3aa3',spot:'#e7c84f'};
+
+// ================= RAJZ: SZURKOLÓ ÁLLATOK =================
+function currentMood(){
+  if(state==='dying'||state==='over') return 'sad';
+  if(time<scaredUntil) return 'scared';
+  if(time-mood.t<1.1) return mood.kind;
+  return 'idle';
+}
+function drawAudience(){
+  const m=currentMood(), size=Math.min(audH*0.9,(W-40)/5), y0=audY+audH*0.5;
+  const kinds=['sun','roka','mokus','nyul','bagoly'];
+  // fűsáv
+  ctx.fillStyle='#2b4a22'; ctx.beginPath(); ctx.ellipse(W/2,audY+audH*0.95,Math.min(W*0.55,size*3.4),audH*0.25,0,0,Math.PI*2); ctx.fill();
+  kinds.forEach((k,i)=>{
+    const x=W/2+(i-2)*size*1.1;
+    let dy=0, sx=0;
+    if(m==='happy'||m==='cheer') dy=-Math.abs(Math.sin(time*(m==='cheer'?16:11)+i))*size*(m==='cheer'?0.28:0.16);
+    else if(m==='scared') sx=Math.sin(time*50+i)*size*0.03;
+    else if(m==='idle') dy=Math.sin(time*2+i*1.3)*size*0.03;
+    drawAnimal(k,x+sx,y0+dy,size*0.42,m,i);
+  });
+}
+function drawAnimal(k,x,y,r,m,i){
+  ctx.save(); ctx.translate(x,y);
+  const col={sun:'#8a6a4a',roka:'#e0782f',mokus:'#b8642a',nyul:'#d9d2c4',bagoly:'#8b6b4f'}[k];
+  ctx.lineWidth=Math.max(1.5,r*0.08); ctx.strokeStyle='#2a1a10';
+  // fülek / extrák
+  if(k==='roka'){ for(const s of [-1,1]){ ctx.fillStyle=col; ctx.beginPath(); ctx.moveTo(s*r*0.35,-r*0.6); ctx.lineTo(s*r*0.85,-r*1.25); ctx.lineTo(s*r*0.9,-r*0.4); ctx.closePath(); ctx.fill(); ctx.stroke(); } }
+  if(k==='nyul'){ for(const s of [-1,1]){ ctx.fillStyle=col; ctx.beginPath(); ctx.ellipse(s*r*0.35,-r*1.15,r*0.2,r*0.55,s*0.15,0,Math.PI*2); ctx.fill(); ctx.stroke(); ctx.fillStyle='#f3a7b8'; ctx.beginPath(); ctx.ellipse(s*r*0.35,-r*1.1,r*0.09,r*0.38,s*0.15,0,Math.PI*2); ctx.fill(); } }
+  if(k==='mokus'){ ctx.fillStyle='#a3541f'; ctx.beginPath(); ctx.ellipse(r*0.95,-r*0.35,r*0.4,r*0.85,0.4,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    for(const s of [-1,1]){ ctx.fillStyle=col; ctx.beginPath(); ctx.moveTo(s*r*0.3,-r*0.75); ctx.lineTo(s*r*0.6,-r*1.15); ctx.lineTo(s*r*0.75,-r*0.6); ctx.closePath(); ctx.fill(); ctx.stroke(); } }
+  if(k==='sun'){ ctx.fillStyle='#4a3420'; for(let a=0;a<9;a++){ const aa=Math.PI+a/8*Math.PI; ctx.beginPath(); ctx.moveTo(Math.cos(aa-0.15)*r*0.85,Math.sin(aa-0.15)*r*0.85); ctx.lineTo(Math.cos(aa)*r*1.35,Math.sin(aa)*r*1.35); ctx.lineTo(Math.cos(aa+0.15)*r*0.85,Math.sin(aa+0.15)*r*0.85); ctx.fill(); } }
+  if(k==='bagoly'){ for(const s of [-1,1]){ ctx.fillStyle=col; ctx.beginPath(); ctx.moveTo(s*r*0.3,-r*0.8); ctx.lineTo(s*r*0.7,-r*1.15); ctx.lineTo(s*r*0.8,-r*0.55); ctx.closePath(); ctx.fill(); ctx.stroke(); } }
+  // fej
+  ctx.fillStyle=col; ctx.beginPath(); ctx.arc(0,0,r*0.9,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  if(k==='roka'){ ctx.fillStyle='#fff3e6'; ctx.beginPath(); ctx.moveTo(-r*0.75,r*0.05); ctx.quadraticCurveTo(0,r*1.1,r*0.75,r*0.05); ctx.quadraticCurveTo(0,r*0.4,-r*0.75,r*0.05); ctx.fill(); }
+  if(k==='sun'||k==='bagoly'){ ctx.fillStyle=k==='sun'?'#e6cfa8':'#e9d8b6'; ctx.beginPath(); ctx.ellipse(0,r*0.2,r*0.6,r*0.55,0,0,Math.PI*2); ctx.fill(); }
+  // szemek a hangulattól függően
+  const ex=k==='bagoly'?r*0.36:r*0.32, ey=-r*0.12, er=k==='bagoly'?r*0.26:r*0.15;
+  for(const s of [-1,1]){
+    ctx.fillStyle='#2a1a10'; ctx.strokeStyle='#2a1a10';
+    if(m==='sad'){ ctx.beginPath(); ctx.arc(s*ex,ey,er*0.8,Math.PI*0.15,Math.PI*0.85); ctx.stroke();
+      ctx.fillStyle='#6cc3ff'; ctx.beginPath(); ctx.ellipse(s*ex,ey+er*0.9+((time*2+i)%1)*r*0.5,r*0.07,r*0.11,0,0,Math.PI*2); ctx.fill(); }
+    else if(m==='happy'||m==='cheer'){ ctx.beginPath(); ctx.arc(s*ex,ey+er*0.3,er*0.8,Math.PI*1.15,Math.PI*1.85); ctx.stroke(); }
+    else if(m==='scared'){ ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(s*ex,ey,er*1.25,0,Math.PI*2); ctx.fill(); ctx.stroke(); ctx.fillStyle='#2a1a10'; ctx.beginPath(); ctx.arc(s*ex,ey,er*0.45,0,Math.PI*2); ctx.fill(); }
+    else { if(k==='bagoly'){ ctx.fillStyle='#ffd23f'; ctx.beginPath(); ctx.arc(s*ex,ey,er,0,Math.PI*2); ctx.fill(); ctx.stroke(); ctx.fillStyle='#2a1a10'; }
+      const blink=((time+i*0.7)%4)<0.12; ctx.beginPath(); blink?ctx.fillRect(s*ex-er*0.6,ey-1,er*1.2,2):ctx.arc(s*ex,ey,er*0.55,0,Math.PI*2); ctx.fill(); }
+  }
+  // orr / száj
+  ctx.fillStyle=k==='bagoly'?'#f2b632':'#2a1a10';
+  if(k==='bagoly'){ ctx.beginPath(); ctx.moveTo(-r*0.1,r*0.12); ctx.lineTo(r*0.1,r*0.12); ctx.lineTo(0,r*0.35); ctx.closePath(); ctx.fill(); }
+  else { ctx.beginPath(); ctx.arc(0,r*0.2,r*0.1,0,Math.PI*2); ctx.fill(); }
+  ctx.strokeStyle='#2a1a10'; ctx.beginPath();
+  if(m==='scared'){ ctx.ellipse(0,r*0.5,r*0.12,r*0.16,0,0,Math.PI*2); ctx.stroke(); }
+  else if(m==='sad'){ ctx.arc(0,r*0.62,r*0.18,Math.PI*1.2,Math.PI*1.8); ctx.stroke(); }
+  else if(m==='happy'||m==='cheer'){ ctx.arc(0,r*0.32,r*0.25,Math.PI*0.15,Math.PI*0.85); ctx.stroke(); }
+  if(m==='happy'||m==='cheer'){ ctx.fillStyle='rgba(255,120,140,.5)'; for(const s of [-1,1]){ ctx.beginPath(); ctx.arc(s*r*0.55,r*0.25,r*0.12,0,Math.PI*2); ctx.fill(); } }
+  ctx.restore();
+}
+
+// ================= FŐ RAJZ =================
+function render(){
+  ctx.fillStyle='#1f2a1c'; ctx.fillRect(0,0,W,H);
+  ctx.save();
+  if(shake>0){ const s=shake*cell*0.5; ctx.translate((Math.random()-0.5)*s,(Math.random()-0.5)*s); }
+  if(boardImg) ctx.drawImage(boardImg.img,bx-boardImg.pad,by-boardImg.pad,(cell*N+boardImg.pad*2),(cell*N+boardImg.pad*2));
+  const t=state==='play'?Math.min(1,tickT/tick):1;
+  // vakondtúrás (vipera érkezik)
+  if(enemy&&enemy.burrowed&&state!=='title'){
+    const h=enemy.hole, x=bx+(h.x+0.5)*cell, y=by+(h.y+0.5)*cell, k=Math.max(0,1-(enemy.emergeAt-time)/1.4), wob=Math.sin(time*30)*cell*0.04*k;
+    ctx.fillStyle='#6b4a2e'; ctx.beginPath(); ctx.ellipse(x+wob,y+cell*0.15,cell*0.45*(0.4+0.6*k),cell*0.3*(0.4+0.6*k),0,Math.PI,0); ctx.fill();
+    ctx.fillStyle='#4a321d'; ctx.beginPath(); ctx.arc(x+wob,y,cell*0.08,0,Math.PI*2); ctx.arc(x+cell*0.18+wob,y+cell*0.05,cell*0.06,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(200,52,107,'+(0.5+0.5*Math.sin(time*12))+')'; ctx.font=`900 ${cell*0.6}px Nunito, sans-serif`; ctx.textAlign='center'; ctx.fillText('!',x,y-cell*0.45);
+  }
+  for(const f of foods) drawPastry(f,time);
+  if(enemy&&!enemy.burrowed&&state!=='title'){ const et=(enemy.phase<1&&state==='play')?t:1; drawSnake(enemy.segs,enemy.prev,state==='play'?t:1,PAL_EN,enemy.dir,true,false); }
+  if(state!=='title') drawSnake(snake,prev,t,PAL_ME,dir,false,state==='dying'||state==='over');
+  // részecskék
+  for(const p of parts){ if(p.life<=0) continue; ctx.globalAlpha=p.life/p.max; ctx.fillStyle=p.col; ctx.beginPath(); ctx.arc(p.x,p.y,p.size,0,Math.PI*2); ctx.fill(); } ctx.globalAlpha=1;
+  // lebegő feliratok
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  for(const f of floaters){ const a=time-f.t; if(a>1.1) continue; ctx.globalAlpha=1-a/1.1; ctx.font=`400 ${Math.max(14,cell*0.75)}px Chewy, cursive`;
+    const x=bx+(f.x+0.5)*cell, y=by+(f.y)*cell-a*cell*1.2; ctx.lineWidth=4; ctx.strokeStyle='#2a1a10'; ctx.strokeText(f.text,x,y); ctx.fillStyle=f.col; ctx.fillText(f.text,x,y); }
+  ctx.globalAlpha=1; ctx.restore();
+  drawAudience();
+  // HUD
+  ctx.textBaseline='middle'; ctx.textAlign='left'; const hy=hudH*0.55, pad=Math.max(14,bx);
+  ctx.font=`400 ${Math.min(30,hudH*0.62)}px Chewy, cursive`; ctx.fillStyle='#f5ecd7'; ctx.fillText('🍰 '+score,pad,hy);
+  ctx.textAlign='center'; ctx.font=`800 ${Math.min(15,hudH*0.32)}px Nunito, sans-serif`; ctx.fillStyle='#b9c9a8';
+  ctx.fillText('hossz '+snake.length+'   ·   rekord '+Math.max(hi,score),W/2,hy);
+  if(combo>1&&time-lastEat<COMBO_WINDOW&&state==='play'){ ctx.textAlign='right'; ctx.font=`400 ${Math.min(26,hudH*0.55)}px Chewy, cursive`; ctx.fillStyle='#f2b632'; ctx.fillText('×'+combo+' kombó',W-pad-44,hy); }
+}
+
+// ================= CIKLUS =================
+let last=performance.now();
+function frame(ms){
+  let dt=(ms-last)/1000; last=ms; if(dt>0.1) dt=0.1;
+  if(state!=='paused') time+=dt;
+  if(state==='play'){
+    tickT+=dt;
+    let guard=0; while(tickT>=tick&&state==='play'&&guard++<3){ tickT-=tick; step(); }
+    // arany süti lejár
+    for(let i=foods.length-1;i>=0;i--) if(foods[i].bonus&&time-foods[i].born>BONUS_LIFE){ burstCells(foods[i].x,foods[i].y,'#f2b632',8); foods.splice(i,1); }
+    if(time>=nextBird){ sBird(); nextBird=time+4+Math.random()*6; }
+  }
+  if(state==='dying'&&time-deathT>1.3) finish();
+  if(shake>0) shake=Math.max(0,shake-dt);
+  for(const p of parts) if(p.life>0){ p.life-=dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=320*dt; }
+  if(W) render();
+  requestAnimationFrame(frame);
+}
+
+// ================= BEMENET =================
+const KEYS={ArrowUp:[0,-1],KeyW:[0,-1],ArrowDown:[0,1],KeyS:[0,1],ArrowLeft:[-1,0],KeyA:[-1,0],ArrowRight:[1,0],KeyD:[1,0]};
+window.addEventListener('keydown',e=>{
+  if(KEYS[e.code]){ e.preventDefault(); turn(...KEYS[e.code]); return; }
+  if(e.code==='KeyP'||e.code==='Escape'){ state==='play'?pause():resume(); return; }
+  if((e.code==='Space'||e.code==='Enter')&&e.target.tagName!=='BUTTON'){ e.preventDefault(); if(state==='title'||state==='over') startGame(); else if(state==='paused') resume(); }
+});
+let sw=null;
+cv.addEventListener('pointerdown',e=>{ sw={x:e.clientX,y:e.clientY}; });
+cv.addEventListener('pointermove',e=>{ if(!sw) return; const dx=e.clientX-sw.x, dy=e.clientY-sw.y;
+  if(Math.max(Math.abs(dx),Math.abs(dy))>24){ Math.abs(dx)>Math.abs(dy)?turn(Math.sign(dx),0):turn(0,Math.sign(dy)); sw={x:e.clientX,y:e.clientY}; } });
+window.addEventListener('pointerup',()=>{ sw=null; });
+document.querySelectorAll('#pad button').forEach(b=>b.addEventListener('pointerdown',e=>{ e.preventDefault(); const [x,y]=b.dataset.d.split(',').map(Number); turn(x,y); }));
+document.getElementById('startBtn').addEventListener('click',startGame);
+document.getElementById('againBtn').addEventListener('click',startGame);
+document.getElementById('resumeBtn').addEventListener('click',resume);
+document.getElementById('muteBtn').addEventListener('click',e=>{ muted=!muted; e.currentTarget.textContent=muted?'🔇':'🔊'; e.currentTarget.setAttribute('aria-pressed',String(muted)); if(master) master.gain.value=muted?0:0.8; e.currentTarget.blur(); });
+document.addEventListener('visibilitychange',()=>{ if(document.hidden) pause(); });
+window.addEventListener('blur',()=>pause());
+window.addEventListener('resize',resize);
+updateHi();
+if(document.fonts&&document.fonts.ready) document.fonts.ready.then(resize);
+resize(); requestAnimationFrame(frame);
+</script>
