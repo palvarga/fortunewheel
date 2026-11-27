@@ -15,7 +15,9 @@ vagy kapcsold be a GitHub Pages-t a repóra.
 - Hang: Web Audio API-val szintetizált pöcök-kattogás és gördülés, némítható
 
 ## QR kód
-`szerencsekerek_qr.png` / `szerencsekerek_qr.svg` – a claude.ai-on közzétett változatra mutat.
+`szerencsekerek_qr.png` / `szerencsekerek_qr.svg` – a nyilvános Vercel-címre mutat.
 
 ## Élő változat
+https://fortunewheel-five.vercel.app
+
 A `main` ágra érkező minden push automatikusan kikerül a Vercelre (projekt: `fortunewheel`).
