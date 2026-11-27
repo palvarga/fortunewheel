@@ -21,3 +21,8 @@ vagy kapcsold be a GitHub Pages-t a repóra.
 https://fortunewheel-five.vercel.app
 
 A `main` ágra érkező minden push automatikusan kikerül a Vercelre (projekt: `fortunewheel`).
+
+## Robot Ütemgyár (`/robotdance`)
+Robotgyári ritmusjáték: üsd ütemre a csavaranyákat (D F J K / nyilak / koppintás), a robotok robothangon éneklik
+a dallamot, és a kombó növekedésével robot-táncból fejen pörgésbe és szélmalomba váltanak.
+Élő: https://fortunewheel-five.vercel.app/robotdance/
