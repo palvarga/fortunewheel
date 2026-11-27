@@ -16,3 +16,6 @@ vagy kapcsold be a GitHub Pages-t a repóra.
 
 ## QR kód
 `szerencsekerek_qr.png` / `szerencsekerek_qr.svg` – a claude.ai-on közzétett változatra mutat.
+
+## Élő változat
+A `main` ágra érkező minden push automatikusan kikerül a Vercelre (projekt: `fortunewheel`).
