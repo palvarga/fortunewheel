@@ -1,0 +1,345 @@
+<title>Arcade Szerencsekerék</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Rubik:wght@400;500;700&display=swap">
+<style>
+/* Layout: egyoszlopos „játékterem-színpad”: fejléc → lépésjelző → 3D kerék → gomb → eredmény */
+:root{
+  --bg:#130d22; --bg2:#22183d; --fg:#f6f0ff; --muted:#a99cc9; --line:#3b2d61;
+  --gold:#ffc93c; --hot:#ff4f8b; --cool:#3ec7ff;
+  --display:'Bungee',Impact,'Arial Black',sans-serif;
+  --body:'Rubik',system-ui,-apple-system,'Segoe UI',sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{
+  background:var(--bg);
+  background-image:radial-gradient(ellipse 80% 55% at 50% 38%, #2c1d52 0%, transparent 70%);
+  color:var(--fg); font-family:var(--body);
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:18px 32px;
+}
+.wrap{max-width:640px;margin:0 auto;display:flex;flex-direction:column;align-items:center;gap:14px}
+h1{font-family:var(--display);font-weight:400;font-size:clamp(1.5rem,5.5vw,2.4rem);margin:0;letter-spacing:.02em;text-align:center;
+   color:var(--gold);text-shadow:0 2px 0 #a2560b,0 0 18px rgba(255,201,60,.45);text-wrap:balance}
+.sub{margin:0;color:var(--muted);font-size:.95rem;text-align:center}
+.steps{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%}
+.slot{border:2px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--bg2);min-width:0;transition:border-color .3s,box-shadow .3s}
+.slot.active{border-color:var(--gold);box-shadow:0 0 0 3px rgba(255,201,60,.15)}
+.slot.done{border-color:var(--cool)}
+.slot .lab{font-size:.72rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
+.slot .val{font-family:var(--display);font-size:clamp(.95rem,3.6vw,1.15rem);margin-top:4px;min-height:1.4em;overflow-wrap:anywhere}
+.stage{position:relative;width:min(100%,560px,66vh);aspect-ratio:1;max-width:100%;perspective:1100px}
+.tilt{width:100%;height:100%;transform:rotateX(11deg);transform-origin:50% 60%}
+canvas{width:100%;height:100%;display:block;cursor:pointer;touch-action:manipulation}
+.floor{position:absolute;left:14%;right:14%;bottom:-2%;height:9%;border-radius:50%;
+  background:radial-gradient(ellipse at center,rgba(0,0,0,.6),transparent 70%);z-index:-1}
+.controls{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+button{font-family:var(--display);font-size:1.1rem;border:0;border-radius:999px;padding:14px 30px;cursor:pointer;color:#2a1600;
+  background:linear-gradient(#ffe27a,#ffb21f);box-shadow:0 5px 0 #b86d06,0 10px 22px rgba(0,0,0,.4);transition:transform .08s,box-shadow .08s,opacity .2s}
+button:active{transform:translateY(4px);box-shadow:0 1px 0 #b86d06,0 4px 10px rgba(0,0,0,.4)}
+button:disabled{opacity:.45;cursor:default}
+button.ghost{font-family:var(--body);font-weight:700;font-size:.95rem;padding:12px 18px;color:var(--fg);background:var(--bg2);box-shadow:inset 0 0 0 2px var(--line)}
+button.ghost:active{transform:translateY(1px)}
+button:focus-visible{outline:3px solid var(--cool);outline-offset:3px}
+.result{width:100%;text-align:center;border-radius:16px;padding:16px;background:linear-gradient(135deg,#3a1d5e,#1b2c5c);
+  border:2px solid var(--gold);box-shadow:0 0 30px rgba(255,201,60,.25)}
+.result .k{font-size:.75rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.result .combo{font-family:var(--display);font-size:clamp(1.3rem,5vw,1.9rem);margin-top:6px;color:var(--gold);text-wrap:balance}
+.hist{width:100%;font-size:.88rem;color:var(--muted)}
+.hist ol{margin:6px 0 0;padding-left:1.4em;display:grid;gap:2px}
+.hint{font-size:.8rem;color:var(--muted);text-align:center;margin:0}
+@media (prefers-reduced-motion:reduce){.tilt{transform:none}}
+</style>
+
+<div class="wrap">
+  <h1>Arcade Szerencsekerék</h1>
+  <p class="sub">Két pörgetés, egy új játék: először az alaptípus, aztán a stílus.</p>
+
+  <div class="steps">
+    <div class="slot active" id="slot1"><div class="lab">1. pörgetés · Alaptípus</div><div class="val" id="v1">?</div></div>
+    <div class="slot" id="slot2"><div class="lab">2. pörgetés · Stílus</div><div class="val" id="v2">?</div></div>
+  </div>
+
+  <div class="stage">
+    <div class="tilt"><canvas id="c" aria-label="Szerencsekerék, kattints a pörgetéshez" role="button" tabindex="0"></canvas></div>
+    <div class="floor"></div>
+  </div>
+
+  <div class="controls">
+    <button id="spin">Pörgetés!</button>
+    <button class="ghost" id="reset" hidden>Új sorsolás</button>
+    <button class="ghost" id="mute" aria-pressed="false">🔊 Hang</button>
+  </div>
+  <p class="hint">Szóköz / Enter vagy koppintás a kerékre is pörget.</p>
+
+  <div class="result" id="result" hidden>
+    <div class="k">A kisorsolt játék</div>
+    <div class="combo" id="combo"></div>
+  </div>
+
+  <div class="hist" id="hist" hidden><strong>Korábbi húzások</strong><ol id="histList"></ol></div>
+</div>
+
+<script>
+// ---------- KONFIG ----------
+const TYPES=["Labirintus-faló","Űrinvázió","Gokartverseny","Ugrálós platformer","Kvíz","Kígyó","Téglatörő","Hulló blokkok","Aszteroidák","Végtelen futás","Átkelő","Toronyépítő","Ritmusjáték","Pong-párbaj","Toronyvédelem"];
+const STYLES=["Középkori","Mikulásos","Erdei állatos","Űrhajós","Focis","Röplabdás","Kalózos","Víz alatti","Dinoszauruszos","Halloweenes","Cyberpunk neon","Vadnyugati","Robotos","Szamurájos","Cukrászdás"];
+const PAL1=["#ff4f8b","#ffb321","#29b8f0","#8b5cff","#22d48e"];
+const PAL2=["#ff7a3d","#19c2b3","#e64fd0","#f2c418","#4f7bff"];
+const CFG={omegaMin:15,omegaRand:7,fricConst:0.85,fricLin:0.11,stopOmega:0.07,bulbs:30};
+
+// ---------- ÁLLAPOT ----------
+const cv=document.getElementById('c'),ctx=cv.getContext('2d');
+let W=0,dpr=1,R=0,cx=0,cy=0,wheelImg=null;
+let stage=0, items=TYPES, pal=PAL1;
+let rot=Math.random()*Math.PI*2, omega=0, spinning=false, lastPeg=0;
+let flap=0, flapV=0, flipT=-1, winFlash=0, picked=[null,null], history=[];
+const seg=()=>Math.PI*2/items.length;
+
+// ---------- HANG ----------
+let ac=null, master=null, noiseBuf=null, rumble=null, muted=false;
+function initAudio(){
+  if(ac) { if(ac.state==='suspended') ac.resume(); return; }
+  try{
+    ac=new (window.AudioContext||window.webkitAudioContext)();
+    master=ac.createGain(); master.gain.value=0.9; master.connect(ac.destination);
+    noiseBuf=ac.createBuffer(1,ac.sampleRate*1,ac.sampleRate);
+    const d=noiseBuf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
+  }catch(e){ ac=null; }
+}
+function tick(v){
+  if(!ac||muted) return;
+  const t=ac.currentTime;
+  // műanyag pöcök csattanása: szűrt zajimpulzus
+  const n=ac.createBufferSource(); n.buffer=noiseBuf;
+  const bp=ac.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=2000+Math.random()*900; bp.Q.value=2.5;
+  const g=ac.createGain(); g.gain.setValueAtTime(0.0001,t);
+  g.gain.exponentialRampToValueAtTime(0.25+0.45*v,t+0.002); g.gain.exponentialRampToValueAtTime(0.0001,t+0.035);
+  n.connect(bp).connect(g).connect(master); n.start(t,Math.random()*0.5); n.stop(t+0.05);
+  // a nyelv faütése: rövid, lefelé csúszó „tok”
+  const o=ac.createOscillator(); o.type='triangle';
+  o.frequency.setValueAtTime(1100+Math.random()*120,t); o.frequency.exponentialRampToValueAtTime(260,t+0.035);
+  const g2=ac.createGain(); g2.gain.setValueAtTime(0.0001,t);
+  g2.gain.exponentialRampToValueAtTime(0.12+0.25*v,t+0.002); g2.gain.exponentialRampToValueAtTime(0.0001,t+0.06);
+  o.connect(g2).connect(master); o.start(t); o.stop(t+0.07);
+}
+function startRumble(){
+  if(!ac||rumble) return;
+  const n=ac.createBufferSource(); n.buffer=noiseBuf; n.loop=true;
+  const lp=ac.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=320;
+  const g=ac.createGain(); g.gain.value=0;
+  n.connect(lp).connect(g).connect(master); n.start();
+  rumble={n,lp,g};
+}
+function setRumble(w){
+  if(!rumble) return;
+  const t=ac.currentTime, lvl=muted?0:Math.min(0.09,w*0.005);
+  rumble.g.gain.setTargetAtTime(lvl,t,0.05); rumble.lp.frequency.setTargetAtTime(160+w*18,t,0.05);
+}
+function stopRumble(){ if(!rumble) return; const r=rumble; rumble=null; r.g.gain.setTargetAtTime(0,ac.currentTime,0.08); setTimeout(()=>{try{r.n.stop()}catch(e){}},500); }
+function fanfare(final){
+  if(!ac||muted) return;
+  const notes=final?[523.25,659.25,783.99,1046.5,1318.5]:[659.25,880,1174.66];
+  notes.forEach((f,i)=>{
+    const t=ac.currentTime+i*0.11, o=ac.createOscillator(), g=ac.createGain();
+    o.type='square'; o.frequency.value=f;
+    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.09,t+0.01); g.gain.exponentialRampToValueAtTime(0.0001,t+(i===notes.length-1?0.6:0.2));
+    o.connect(g).connect(master); o.start(t); o.stop(t+0.7);
+  });
+}
+
+// ---------- RAJZ ----------
+function resize(){
+  dpr=Math.min(window.devicePixelRatio||1,2.5);
+  W=Math.round(cv.clientWidth*dpr); if(!W) return;
+  cv.width=W; cv.height=W;
+  R=W*0.385; cx=W/2; cy=W*0.535;
+  buildWheel();
+}
+function shade(hex,amt){
+  const n=parseInt(hex.slice(1),16); let r=n>>16,g=(n>>8)&255,b=n&255;
+  const f=v=>Math.max(0,Math.min(255,Math.round(amt<0?v*(1+amt):v+(255-v)*amt)));
+  return `rgb(${f(r)},${f(g)},${f(b)})`;
+}
+function buildWheel(){
+  const S=Math.ceil(R*2), oc=document.createElement('canvas'); oc.width=S; oc.height=S;
+  const g=oc.getContext('2d'), r=S/2, n=items.length, s=Math.PI*2/n;
+  g.translate(r,r);
+  for(let i=0;i<n;i++){
+    const col=pal[i%pal.length];
+    const gr=g.createRadialGradient(0,0,r*0.12,0,0,r);
+    gr.addColorStop(0,shade(col,0.35)); gr.addColorStop(0.55,col); gr.addColorStop(1,shade(col,-0.35));
+    g.beginPath(); g.moveTo(0,0); g.arc(0,0,r,i*s,(i+1)*s); g.closePath(); g.fillStyle=gr; g.fill();
+  }
+  // osztóvonalak
+  g.strokeStyle='rgba(255,255,255,.75)'; g.lineWidth=Math.max(1.5,r*0.008);
+  for(let i=0;i<n;i++){ g.save(); g.rotate(i*s); g.beginPath(); g.moveTo(r*0.16,0); g.lineTo(r,0); g.stroke(); g.restore(); }
+  // feliratok
+  g.textAlign='right'; g.textBaseline='middle';
+  for(let i=0;i<n;i++){
+    g.save(); g.rotate((i+0.5)*s);
+    let fs=r*0.085; const maxW=r*0.64; const txt=items[i];
+    do{ g.font=`700 ${fs}px Rubik, system-ui, sans-serif`; if(g.measureText(txt).width<=maxW) break; fs*=0.94; }while(fs>r*0.045);
+    g.lineJoin='round'; g.lineWidth=fs*0.22; g.strokeStyle='rgba(20,8,40,.75)';
+    g.strokeText(txt,r*0.86,0); g.fillStyle='#fff'; g.fillText(txt,r*0.86,0);
+    g.restore();
+  }
+  // pöckök a szegmenshatárokon
+  for(let i=0;i<n;i++){
+    const a=i*s, px=Math.cos(a)*r*0.935, py=Math.sin(a)*r*0.935, pr=r*0.028;
+    const pg=g.createRadialGradient(px-pr*0.3,py-pr*0.3,pr*0.1,px,py,pr);
+    pg.addColorStop(0,'#fff6cf'); pg.addColorStop(0.5,'#e6b12f'); pg.addColorStop(1,'#7a4f07');
+    g.beginPath(); g.arc(px,py,pr,0,Math.PI*2); g.fillStyle=pg; g.fill();
+  }
+  wheelImg=oc;
+}
+function draw(time){
+  if(!W) return;
+  ctx.clearRect(0,0,W,W);
+  const n=items.length;
+  // külső fémperem
+  const rimO=R*1.1, rimI=R*0.985;
+  let gr=ctx.createLinearGradient(cx-rimO,cy-rimO,cx+rimO,cy+rimO);
+  gr.addColorStop(0,'#fff1b8'); gr.addColorStop(0.3,'#d99a1e'); gr.addColorStop(0.55,'#7a4a06'); gr.addColorStop(0.8,'#e8b43a'); gr.addColorStop(1,'#5a3504');
+  ctx.beginPath(); ctx.arc(cx,cy,rimO,0,Math.PI*2); ctx.arc(cx,cy,rimI,0,Math.PI*2,true); ctx.fillStyle=gr; ctx.fill();
+  ctx.beginPath(); ctx.arc(cx,cy,rimO,0,Math.PI*2); ctx.strokeStyle='rgba(0,0,0,.5)'; ctx.lineWidth=R*0.012; ctx.stroke();
+  // izzók
+  const B=CFG.bulbs, chase=Math.floor(time*(spinning?14:2.2));
+  for(let k=0;k<B;k++){
+    const a=k/B*Math.PI*2, bx=cx+Math.cos(a)*R*1.045, by=cy+Math.sin(a)*R*1.045, br=R*0.026;
+    let on = winFlash>0 ? (Math.floor(time*9)%2===0) : spinning ? ((k+chase)%3===0) : ((k+chase)%2===0);
+    if(on){
+      const gl=ctx.createRadialGradient(bx,by,0,bx,by,br*3);
+      gl.addColorStop(0,'rgba(255,240,180,.9)'); gl.addColorStop(1,'rgba(255,200,60,0)');
+      ctx.fillStyle=gl; ctx.beginPath(); ctx.arc(bx,by,br*3,0,Math.PI*2); ctx.fill();
+    }
+    ctx.beginPath(); ctx.arc(bx,by,br,0,Math.PI*2); ctx.fillStyle=on?'#fffbe6':'#6b4a1a'; ctx.fill();
+  }
+  // forgó kerék (fordításkor „lapozó” animáció)
+  ctx.save(); ctx.translate(cx,cy);
+  if(flipT>=0){ ctx.scale(Math.max(0.02,Math.abs(Math.cos(flipT*Math.PI))),1); }
+  ctx.rotate(rot);
+  if(wheelImg) ctx.drawImage(wheelImg,-R,-R,R*2,R*2);
+  ctx.restore();
+  // térhatás: peremárnyék + fényes csillanás
+  ctx.save(); ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.clip();
+  gr=ctx.createRadialGradient(cx,cy,R*0.7,cx,cy,R); gr.addColorStop(0,'rgba(0,0,0,0)'); gr.addColorStop(1,'rgba(0,0,0,.38)');
+  ctx.fillStyle=gr; ctx.fillRect(cx-R,cy-R,R*2,R*2);
+  gr=ctx.createRadialGradient(cx-R*0.35,cy-R*0.5,R*0.05,cx-R*0.2,cy-R*0.3,R*1.05);
+  gr.addColorStop(0,'rgba(255,255,255,.34)'); gr.addColorStop(0.45,'rgba(255,255,255,.06)'); gr.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle=gr; ctx.fillRect(cx-R,cy-R,R*2,R*2);
+  ctx.restore();
+  // agy (középső kupola)
+  const hr=R*0.17;
+  gr=ctx.createRadialGradient(cx-hr*0.35,cy-hr*0.4,hr*0.1,cx,cy,hr);
+  gr.addColorStop(0,'#fff6cc'); gr.addColorStop(0.45,'#f0b72a'); gr.addColorStop(1,'#80510a');
+  ctx.beginPath(); ctx.arc(cx,cy,hr*1.12,0,Math.PI*2); ctx.fillStyle='#3b2306'; ctx.fill();
+  ctx.beginPath(); ctx.arc(cx,cy,hr,0,Math.PI*2); ctx.fillStyle=gr; ctx.fill();
+  ctx.fillStyle='#3b1f00'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.font=`400 ${hr*0.9}px Bungee, Impact, sans-serif`;
+  ctx.fillText(stage===2?'★':String(stage+1),cx,cy+hr*0.06);
+  // mutató nyelv (pöckökön csattan)
+  const px=cx, py=cy-R*1.17;
+  ctx.save(); ctx.translate(px,py); ctx.rotate(flap);
+  ctx.shadowColor='rgba(0,0,0,.5)'; ctx.shadowBlur=R*0.04; ctx.shadowOffsetY=R*0.015;
+  ctx.beginPath(); ctx.moveTo(-R*0.075,0); ctx.lineTo(R*0.075,0); ctx.lineTo(0,R*0.33); ctx.closePath();
+  gr=ctx.createLinearGradient(-R*0.08,0,R*0.08,0); gr.addColorStop(0,'#ff8fb4'); gr.addColorStop(0.5,'#ff2d6f'); gr.addColorStop(1,'#9c0d3a');
+  ctx.fillStyle=gr; ctx.fill(); ctx.shadowColor='transparent';
+  ctx.lineWidth=R*0.012; ctx.strokeStyle='#fff'; ctx.stroke();
+  ctx.beginPath(); ctx.arc(0,0,R*0.05,0,Math.PI*2);
+  gr=ctx.createRadialGradient(-R*0.015,-R*0.015,0,0,0,R*0.05); gr.addColorStop(0,'#fff'); gr.addColorStop(1,'#8a8a99');
+  ctx.fillStyle=gr; ctx.fill();
+  ctx.restore();
+}
+
+// ---------- LOGIKA ----------
+const $=id=>document.getElementById(id);
+function pegIndex(){ return Math.floor(rot/seg()); }
+function pickedIndex(){
+  const s=seg(); let local=(-Math.PI/2-rot)%(Math.PI*2); if(local<0) local+=Math.PI*2;
+  return Math.floor(local/s)%items.length;
+}
+function spin(){
+  if(spinning||stage===2||flipT>=0) return;
+  initAudio(); startRumble();
+  omega=CFG.omegaMin+Math.random()*CFG.omegaRand;
+  spinning=true; winFlash=0; lastPeg=pegIndex();
+  $('spin').disabled=true;
+}
+function finishSpin(){
+  spinning=false; stopRumble();
+  const val=items[pickedIndex()];
+  picked[stage]=val; winFlash=1.6;
+  if(stage===0){
+    $('v1').textContent=val; $('slot1').classList.replace('active','done');
+    fanfare(false);
+    setTimeout(()=>{ flipT=0; },900);
+  }else{
+    $('v2').textContent=val; $('slot2').classList.replace('active','done');
+    stage=2; fanfare(true);
+    $('combo').textContent=`${picked[1]} ${picked[0].toLowerCase()}`;
+    $('result').hidden=false; $('reset').hidden=false; $('spin').hidden=true;
+    history.unshift(`${picked[1]} ${picked[0].toLowerCase()}`); history=history.slice(0,8);
+    $('histList').innerHTML=history.map(h=>`<li>${h}</li>`).join(''); $('hist').hidden=history.length<2;
+  }
+}
+function swapToStyles(){
+  stage=1; items=STYLES; pal=PAL2; buildWheel();
+  $('slot2').classList.add('active');
+}
+function reset(){
+  stage=0; items=TYPES; pal=PAL1; picked=[null,null]; buildWheel();
+  $('v1').textContent='?'; $('v2').textContent='?';
+  $('slot1').className='slot active'; $('slot2').className='slot';
+  $('result').hidden=true; $('reset').hidden=true; $('spin').hidden=false; $('spin').disabled=false;
+  winFlash=0;
+}
+
+// ---------- CIKLUS ----------
+let last=performance.now();
+function loop(now){
+  let dt=(now-last)/1000; last=now; if(dt>0.05) dt=0.05;
+  if(spinning){
+    omega-= (CFG.fricConst+CFG.fricLin*omega)*dt;
+    // a pöcök fékez is egy picit, amikor a nyelv beleakad (lassú fázisban érezhető)
+    if(omega<=CFG.stopOmega){ omega=0; finishSpin(); }
+    rot+=omega*dt;
+    const p=pegIndex();
+    if(p!==lastPeg){
+      const crossed=Math.min(2,Math.abs(p-lastPeg)); lastPeg=p;
+      for(let i=0;i<crossed;i++) setTimeout(()=>tick(Math.min(1,omega/12)),i*8);
+      flap=-Math.min(0.55,0.22+omega*0.02); flapV=0;
+    }
+    setRumble(omega);
+  }
+  // nyelv rugózása
+  const k=420,c=16; flapV+=(-k*flap-c*flapV)*dt; flap+=flapV*dt;
+  if(flipT>=0){
+    const before=flipT; flipT+=dt*1.6;
+    if(before<0.5&&flipT>=0.5) swapToStyles();
+    if(flipT>=1){ flipT=-1; $('spin').disabled=false; }
+  }
+  if(winFlash>0) winFlash-=dt;
+  draw(now/1000);
+  requestAnimationFrame(loop);
+}
+
+// ---------- BEMENET ----------
+$('spin').addEventListener('click',spin);
+$('reset').addEventListener('click',reset);
+cv.addEventListener('click',()=>{ if(stage===2) return; spin(); });
+cv.addEventListener('keydown',e=>{ if(e.key===' '||e.key==='Enter'){ e.preventDefault(); stage===2?reset():spin(); } });
+window.addEventListener('keydown',e=>{
+  if(e.target.tagName==='BUTTON'||e.target===cv) return;
+  if(e.key===' '||e.key==='Enter'){ e.preventDefault(); stage===2?reset():spin(); }
+});
+$('mute').addEventListener('click',()=>{
+  muted=!muted; $('mute').textContent=muted?'🔇 Néma':'🔊 Hang'; $('mute').setAttribute('aria-pressed',String(muted));
+  if(muted) setRumble(0);
+});
+document.addEventListener('visibilitychange',()=>{ if(document.hidden&&ac) ac.suspend(); else if(ac) ac.resume(); });
+window.addEventListener('resize',resize);
+if(document.fonts&&document.fonts.ready) document.fonts.ready.then(resize);
+resize(); requestAnimationFrame(loop);
+</script>

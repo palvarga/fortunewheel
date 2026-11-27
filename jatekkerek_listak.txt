@@ -1,0 +1,40 @@
+ARCADE SZERENCSEKERÉK – kipörgethető elemek
+============================================
+
+1. PÖRGETÉS – ALAPTÍPUS (15)
+----------------------------
+ 1. Labirintus-faló        (pl. PAC-MAN-szerű: pöttyök gyűjtése, üldözők elől menekülés)
+ 2. Űrinvázió              (pl. Space Invaders-szerű: lefelé ereszkedő támadók lelövése)
+ 3. Gokartverseny          (pl. Mario Kart-szerű: verseny, bónuszdobozok, csúszások)
+ 4. Ugrálós platformer     (pl. Super Mario-szerű: ugrálás, ellenfelek, pályavég)
+ 5. Kvíz                   (időre megválaszolt kérdések, pontgyűjtés)
+ 6. Kígyó                  (pl. Snake: növekvő kígyó, ne harapj magadba)
+ 7. Téglatörő              (pl. Breakout/Arkanoid: labda, ütő, téglafal)
+ 8. Hulló blokkok          (pl. Tetris-szerű: sorok kirakása)
+ 9. Aszteroidák            (pl. Asteroids: tehetetlenséges űrhajó, darabolódó sziklák)
+10. Végtelen futás         (endless runner: akadályok átugrása, gyorsuló tempó)
+11. Átkelő                 (pl. Frogger-szerű: forgalmas úton, folyón át)
+12. Toronyépítő            (elemek egymásra rakása, egyensúlyozás)
+13. Ritmusjáték            (ütemre leütött gombok, kombók)
+14. Pong-párbaj            (pl. Pong / léghoki: két ütő, egy labda)
+15. Toronyvédelem          (tower defense: tornyok lerakása, hullámok)
+
+2. PÖRGETÉS – STÍLUS (15)
+-------------------------
+ 1. Középkori              (lovagok, várak, sárkányok)
+ 2. Mikulásos              (karácsony, szánok, ajándékok, hó)
+ 3. Erdei állatos          (rókák, sünök, őzek, mókusok)
+ 4. Űrhajós                (rakéták, bolygók, csillagködök)
+ 5. Focis                  (labda, kapu, stadion)
+ 6. Röplabdás              (háló, strand, csapatjáték)
+ 7. Kalózos                (hajók, kincsesláda, papagáj)
+ 8. Víz alatti             (halak, korallok, tengeralattjáró)
+ 9. Dinoszauruszos         (őskori dzsungel, vulkánok)
+10. Halloweenes            (tökök, szellemek, denevérek)
+11. Cyberpunk neon         (neonvárosi éjszaka, hackerek, drónok)
+12. Vadnyugati             (cowboyok, szalon, ördögszekér)
+13. Robotos                (gépek, fogaskerekek, gyárcsarnok)
+14. Szamurájos             (japán kert, katanák, cseresznyevirág)
+15. Cukrászdás             (sütemények, cukorkák, habcsók)
+
+Kombinációk száma: 15 × 15 = 225 különböző játékötlet.
